@@ -1,0 +1,466 @@
+'use client'
+
+import { useState } from 'react'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
+import { LoadingState } from '@/components/LoadingState'
+import { TextArea } from '@/components/ui/TextArea'
+import { useFetch } from '@/lib/hooks/useFetch'
+import type { ApiError, Lesson } from '@/lib/types'
+
+interface AdminBook {
+  id: number
+  slug: string
+  title: string
+  author: string | null
+  description: string | null
+  category: string | null
+  content: string
+  preview: string | null
+  cover_url: string | null
+}
+
+interface AdminCourse {
+  id: number
+  title: string
+  description: string | null
+  price_cents: number
+  lessons: Lesson[]
+}
+
+interface BooksResponse extends ApiError {
+  books: AdminBook[]
+}
+
+interface CoursesResponse extends ApiError {
+  courses: AdminCourse[]
+}
+
+const emptyBookForm = {
+  slug: '',
+  title: '',
+  author: '',
+  description: '',
+  category: '',
+  content: '',
+  preview: '',
+  cover_url: '',
+}
+
+const emptyCourseForm = {
+  title: '',
+  description: '',
+  price_cents: 0,
+  lessons: '[]',
+}
+
+export default function AdminPage() {
+  const [password, setPassword] = useState('')
+  const [authenticated, setAuthenticated] = useState(false)
+  const [tab, setTab] = useState<'books' | 'courses'>('books')
+  const [message, setMessage] = useState('')
+  const [bookForm, setBookForm] = useState(emptyBookForm)
+  const [courseForm, setCourseForm] = useState(emptyCourseForm)
+  const [editingBook, setEditingBook] = useState<AdminBook | null>(null)
+  const [editingCourse, setEditingCourse] = useState<AdminCourse | null>(null)
+
+  const books = useFetch<BooksResponse>('/api/admin/books', { skip: !authenticated })
+  const courses = useFetch<CoursesResponse>('/api/admin/courses', { skip: !authenticated })
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage('')
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = (await res.json().catch(() => null)) as ApiError | null
+      if (res.ok) {
+        setAuthenticated(true)
+      } else {
+        setMessage(data?.error ?? 'Неверный пароль')
+      }
+    } catch {
+      setMessage('Ошибка сети')
+    }
+  }
+
+  const handleLogout = async () => {
+    await fetch('/api/logout', { method: 'POST' })
+    setAuthenticated(false)
+    setPassword('')
+    setMessage('')
+  }
+
+  // --- Книги ---
+  const resetBookForm = () => {
+    setBookForm(emptyBookForm)
+    setEditingBook(null)
+  }
+
+  const handleSaveBook = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const url = editingBook ? `/api/admin/books/${editingBook.id}` : '/api/admin/books'
+    const res = await fetch(url, {
+      method: editingBook ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bookForm),
+    })
+    const data = (await res.json().catch(() => null)) as ApiError | null
+    if (res.ok) {
+      setMessage(editingBook ? 'Книга обновлена' : 'Книга добавлена')
+      resetBookForm()
+      books.reload()
+    } else {
+      setMessage(data?.error ?? 'Ошибка сохранения')
+    }
+  }
+
+  const handleEditBook = (book: AdminBook) => {
+    setEditingBook(book)
+    setBookForm({
+      slug: book.slug,
+      title: book.title,
+      author: book.author ?? '',
+      description: book.description ?? '',
+      category: book.category ?? '',
+      content: book.content,
+      preview: book.preview ?? '',
+      cover_url: book.cover_url ?? '',
+    })
+  }
+
+  const handleDeleteBook = async (id: number) => {
+    if (!confirm('Удалить книгу?')) return
+    const res = await fetch(`/api/admin/books/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setMessage('Книга удалена')
+      books.reload()
+    } else {
+      setMessage('Ошибка удаления')
+    }
+  }
+
+  // --- Курсы ---
+  const resetCourseForm = () => {
+    setCourseForm(emptyCourseForm)
+    setEditingCourse(null)
+  }
+
+  const handleSaveCourse = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    let lessons: unknown
+    try {
+      lessons = JSON.parse(courseForm.lessons)
+    } catch {
+      setMessage('Уроки должны быть в формате JSON')
+      return
+    }
+
+    const url = editingCourse ? `/api/admin/courses/${editingCourse.id}` : '/api/admin/courses'
+    const res = await fetch(url, {
+      method: editingCourse ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...courseForm, lessons }),
+    })
+    const data = (await res.json().catch(() => null)) as ApiError | null
+    if (res.ok) {
+      setMessage(editingCourse ? 'Курс обновлён' : 'Курс добавлен')
+      resetCourseForm()
+      courses.reload()
+    } else {
+      setMessage(data?.error ?? 'Ошибка сохранения')
+    }
+  }
+
+  const handleEditCourse = (course: AdminCourse) => {
+    setEditingCourse(course)
+    setCourseForm({
+      title: course.title,
+      description: course.description ?? '',
+      price_cents: course.price_cents,
+      lessons: JSON.stringify(course.lessons, null, 2),
+    })
+  }
+
+  const handleDeleteCourse = async (id: number) => {
+    if (!confirm('Удалить курс?')) return
+    const res = await fetch(`/api/admin/courses/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setMessage('Курс удалён')
+      courses.reload()
+    } else {
+      setMessage('Ошибка удаления')
+    }
+  }
+
+  if (!authenticated) {
+    return (
+      <div className="mx-auto mt-6 max-w-md sm:mt-16">
+        <Card variant="elevated" className="p-8">
+          <div className="mb-6 text-center">
+            <h1 className="font-serif text-2xl font-bold text-ink-900">Админ-панель</h1>
+            <p className="mt-1.5 text-sm text-ink-500">Вход для администратора</p>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <Input
+              type="password"
+              placeholder="Пароль"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            {message && (
+              <p className="rounded-lg bg-danger-50 px-3.5 py-2.5 text-sm text-danger-600">
+                {message}
+              </p>
+            )}
+            <Button type="submit" size="lg" className="w-full">
+              Войти
+            </Button>
+          </form>
+        </Card>
+      </div>
+    )
+  }
+
+  if (books.loading || courses.loading) {
+    return <LoadingState label="Загрузка данных..." />
+  }
+
+  const bookList = books.data?.books ?? []
+  const courseList = courses.data?.courses ?? []
+
+  return (
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="kicker mb-1">Администрирование</p>
+          <h1 className="font-serif text-3xl font-bold tracking-tight text-ink-900">Админ-панель</h1>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-4 py-2 text-sm font-medium text-ink-700 transition hover:border-danger-500 hover:text-danger-600"
+        >
+          Выйти
+        </button>
+      </div>
+
+      {message && (
+        <div className="mb-6 rounded-card border border-ink-200 bg-white p-3.5 text-sm text-ink-700 shadow-card">
+          {message}
+        </div>
+      )}
+
+      <div className="mb-6 flex gap-2">
+        <Button
+          variant={tab === 'books' ? 'primary' : 'outline'}
+          onClick={() => {
+            setTab('books')
+            setMessage('')
+          }}
+        >
+          Книги
+        </Button>
+        <Button
+          variant={tab === 'courses' ? 'primary' : 'outline'}
+          onClick={() => {
+            setTab('courses')
+            setMessage('')
+          }}
+        >
+          Курсы
+        </Button>
+      </div>
+
+      {tab === 'books' && (
+        <div>
+          <h2 className="mb-4 font-serif text-2xl font-bold text-ink-900">
+            {editingBook ? 'Редактировать книгу' : 'Добавить книгу'}
+          </h2>
+          <form
+            onSubmit={handleSaveBook}
+            className="mb-8 space-y-4 rounded-card border border-ink-200 bg-white p-5 shadow-card sm:p-6"
+          >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Input
+                placeholder="Slug *"
+                value={bookForm.slug}
+                onChange={(e) => setBookForm({ ...bookForm, slug: e.target.value })}
+                required
+              />
+              <Input
+                placeholder="Название *"
+                value={bookForm.title}
+                onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })}
+                required
+              />
+              <Input
+                placeholder="Автор"
+                value={bookForm.author}
+                onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })}
+              />
+              <Input
+                placeholder="Категория"
+                value={bookForm.category}
+                onChange={(e) => setBookForm({ ...bookForm, category: e.target.value })}
+              />
+              <Input
+                placeholder="URL обложки"
+                value={bookForm.cover_url}
+                onChange={(e) => setBookForm({ ...bookForm, cover_url: e.target.value })}
+                className="md:col-span-2"
+              />
+            </div>
+            <TextArea
+              placeholder="Описание"
+              value={bookForm.description}
+              onChange={(e) => setBookForm({ ...bookForm, description: e.target.value })}
+              rows={2}
+            />
+            <TextArea
+              placeholder="Превью (Markdown)"
+              value={bookForm.preview}
+              onChange={(e) => setBookForm({ ...bookForm, preview: e.target.value })}
+              rows={3}
+            />
+            <TextArea
+              placeholder="Полный контент (Markdown) *"
+              value={bookForm.content}
+              onChange={(e) => setBookForm({ ...bookForm, content: e.target.value })}
+              rows={6}
+              required
+            />
+            <div className="flex gap-3">
+              <Button type="submit" variant="success">
+                {editingBook ? 'Обновить' : 'Добавить'}
+              </Button>
+              {editingBook && (
+                <Button variant="outline" onClick={resetBookForm}>
+                  Отмена
+                </Button>
+              )}
+            </div>
+          </form>
+
+          <h3 className="mb-3 text-xl font-bold text-ink-900">Список книг</h3>
+          <div className="space-y-2">
+            {bookList.map((book) => (
+              <div
+                key={book.id}
+                className="flex items-center justify-between gap-3 rounded-card border border-ink-200 bg-white px-4 py-3 shadow-card"
+              >
+                <div className="min-w-0">
+                  <strong className="text-ink-900">{book.title}</strong>
+                  <span className="text-sm text-ink-500"> (slug: {book.slug})</span>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => handleEditBook(book)}
+                    className="rounded-lg px-3 py-1.5 text-sm font-semibold text-brand-600 transition hover:bg-brand-50 hover:text-brand-700"
+                  >
+                    Ред.
+                  </button>
+                  <button
+                    onClick={() => handleDeleteBook(book.id)}
+                    className="rounded-lg px-3 py-1.5 text-sm font-semibold text-danger-600 transition hover:bg-danger-50 hover:text-danger-700"
+                  >
+                    Удалить
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'courses' && (
+        <div>
+          <h2 className="mb-4 font-serif text-2xl font-bold text-ink-900">
+            {editingCourse ? 'Редактировать курс' : 'Добавить курс'}
+          </h2>
+          <form
+            onSubmit={handleSaveCourse}
+            className="mb-8 space-y-4 rounded-card border border-ink-200 bg-white p-5 shadow-card sm:p-6"
+          >
+            <Input
+              placeholder="Название *"
+              value={courseForm.title}
+              onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+              required
+            />
+            <TextArea
+              placeholder="Описание"
+              value={courseForm.description}
+              onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })}
+              rows={2}
+            />
+            <Input
+              type="number"
+              placeholder="Цена в центах *"
+              value={courseForm.price_cents}
+              onChange={(e) =>
+                setCourseForm({ ...courseForm, price_cents: Number(e.target.value) })
+              }
+              required
+            />
+            <TextArea
+              placeholder="Уроки (JSON массив) *"
+              value={courseForm.lessons}
+              onChange={(e) => setCourseForm({ ...courseForm, lessons: e.target.value })}
+              className="font-mono text-sm"
+              rows={8}
+              required
+            />
+            <div className="flex gap-3">
+              <Button type="submit" variant="success">
+                {editingCourse ? 'Обновить' : 'Добавить'}
+              </Button>
+              {editingCourse && (
+                <Button variant="outline" onClick={resetCourseForm}>
+                  Отмена
+                </Button>
+              )}
+            </div>
+          </form>
+
+          <h3 className="mb-3 text-xl font-bold text-ink-900">Список курсов</h3>
+          <div className="space-y-2">
+            {courseList.map((course) => (
+              <div
+                key={course.id}
+                className="flex items-center justify-between gap-3 rounded-card border border-ink-200 bg-white px-4 py-3 shadow-card"
+              >
+                <div className="min-w-0">
+                  <strong className="text-ink-900">{course.title}</strong>
+                  <span className="text-sm text-ink-500">
+                    {' '}
+                    — ${(course.price_cents / 100).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => handleEditCourse(course)}
+                    className="rounded-lg px-3 py-1.5 text-sm font-semibold text-brand-600 transition hover:bg-brand-50 hover:text-brand-700"
+                  >
+                    Ред.
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCourse(course.id)}
+                    className="rounded-lg px-3 py-1.5 text-sm font-semibold text-danger-600 transition hover:bg-danger-50 hover:text-danger-700"
+                  >
+                    Удалить
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * ГЛУБИНА — дизайн-система
+ * --------------------------
+ * Метафора: глубокая вода / чтение при лампе.
+ *  - brand (глубокий тил-синий): спокойствие, доверие, «глубина»
+ *  - lamp (тёплый янтарь): лампа, уют чтения, акценты
+ *  - ink (нейтральные с холодным оттенком): типографика
+ *  - paper / surface: тёплая бумага и белые поверхности
+ */
+
+@theme {
+  /* Поверхности */
+  --color-paper: #f6f4ef;
+  --color-surface: #ffffff;
+
+  /* Бренд — глубокий тил */
+  --color-brand-50: #f0f7f6;
+  --color-brand-100: #d9ecea;
+  --color-brand-200: #b7d9d6;
+  --color-brand-300: #8cbfbc;
+  --color-brand-400: #5fa09e;
+  --color-brand-500: #438584;
+  --color-brand-600: #346d6d;
+  --color-brand-700: #2c585a;
+  --color-brand-800: #28484a;
+  --color-brand-900: #233c3f;
+  --color-brand-950: #122325;
+
+  /* Акцент — лампа */
+  --color-lamp-300: #f4d08a;
+  --color-lamp-400: #eeb453;
+  --color-lamp-500: #dd9a24;
+  --color-lamp-600: #bd7c15;
+
+  /* Нейтральные — чернила */
+  --color-ink-50: #f4f6f6;
+  --color-ink-100: #e7ebec;
+  --color-ink-200: #d2d9da;
+  --color-ink-300: #b3bfc1;
+  --color-ink-400: #8a9a9d;
+  --color-ink-500: #6d7e81;
+  --color-ink-600: #566669;
+  --color-ink-700: #475458;
+  --color-ink-800: #3c4649;
+  --color-ink-900: #2a3134;
+  --color-ink-950: #181e20;
+
+  /* Семантические */
+  --color-success-50: #eef7f2;
+  --color-success-100: #d5ecdf;
+  --color-success-200: #c2e3cf;
+  --color-success-500: #2f8a5b;
+  --color-success-600: #25714c;
+  --color-success-700: #1f5c40;
+
+  --color-danger-50: #fcf0ef;
+  --color-danger-100: #f7dbd8;
+  --color-danger-200: #f1cfcb;
+  --color-danger-500: #c4473c;
+  --color-danger-600: #a8382f;
+  --color-danger-700: #8a2d26;
+
+  /* Тени */
+  --shadow-soft: 0 1px 2px rgb(18 35 37 / 0.05), 0 4px 12px rgb(18 35 37 / 0.06);
+  --shadow-card: 0 1px 3px rgb(18 35 37 / 0.08);
+  --shadow-lift: 0 2px 4px rgb(18 35 37 / 0.06), 0 12px 32px rgb(18 35 37 / 0.12);
+
+  /* Радиусы */
+  --radius-card: 1rem;
 }
 
+/* Шрифты: переменные объявляются через next/font */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: var(--font-pt-serif), "Georgia", "Times New Roman", serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-paper text-ink-800 antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-600);
+    color: #ffffff;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* Маленький надзаголовок-метка */
+  .kicker {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-brand-600;
+  }
+
+  /* Типографика чтения (серифная, «бумажная») */
+  .prose-book {
+    font-family: var(--font-pt-serif), "Georgia", serif;
+    font-size: 1.15rem;
+    line-height: 1.9;
+    color: var(--color-ink-800);
+    white-space: pre-wrap;
+  }
+
+  .prose-book h3 {
+    margin-bottom: 0.75rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--color-ink-900);
+  }
+
+  .prose-book p + p {
+    margin-top: 1rem;
+  }
 }
