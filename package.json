@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "seed": "tsx lib/seed.ts",
-    "migrate": "tsx lib/migrate.ts"
+    "seed": "tsx --env-file=.env.local lib/seed.ts",
+    "migrate": "tsx --env-file=.env.local lib/migrate.ts",
+    "setup:turso": "tsx lib/setup-turso.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
