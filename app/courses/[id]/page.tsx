@@ -19,7 +19,8 @@ export default function CourseDetailPage() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id
 
   const { data, loading, error, reload } = useFetch<CourseResponse>(
-    id ? `/api/courses/${id}` : ''
+    `/api/courses/${id}`,
+    { skip: !id }
   )
 
   if (!id) return <ErrorState message="Не указан ID курса" />

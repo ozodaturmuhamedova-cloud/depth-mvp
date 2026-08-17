@@ -47,7 +47,7 @@ export default function RegisterPage() {
       <Card variant="elevated" className="p-8 sm:p-10">
         <div className="mb-8 text-center">
           <h1 className="font-serif text-2xl font-bold text-ink-900">Регистрация</h1>
-          <p className="mt-1.5 text-sm text-ink-500">Начните путь к глубине</p>
+          <p className="mt-1.5 text-sm text-ink-500">Создайте аккаунт и начните читать</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
           <Input

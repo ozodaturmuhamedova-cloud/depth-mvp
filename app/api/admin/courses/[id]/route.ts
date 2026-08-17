@@ -18,6 +18,12 @@ export async function PUT(
     }
     const body = await request.json();
     const { title, description, price_cents, lessons } = body;
+    if (!title || typeof price_cents !== 'number' || price_cents < 0 || !lessons) {
+      return NextResponse.json(
+        { error: 'title, price_cents (>= 0) и lessons обязательны' },
+        { status: 400 }
+      );
+    }
     await run(
       'UPDATE courses SET title=?, description=?, price_cents=?, lessons=? WHERE id=?',
       [title, description || null, price_cents, JSON.stringify(lessons), courseId]

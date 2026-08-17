@@ -10,7 +10,7 @@ export async function GET() {
   }
 
   const user = await get<User>(
-    'SELECT id, email, name, created_at FROM users WHERE id = ?',
+    'SELECT id, email, name, role, created_at FROM users WHERE id = ?',
     [userId]
   );
   if (!user) {

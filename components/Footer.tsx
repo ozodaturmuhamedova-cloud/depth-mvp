@@ -28,7 +28,7 @@ export function Footer() {
           <div className="max-w-sm space-y-4">
             <Logo tone="light" />
             <p className="text-sm leading-relaxed text-brand-200">
-              Читайте лучшие книги и проходите курсы по психологии вдумчиво — на глубине.
+              Читайте лучшие книги и проходите курсы по психологии вдумчиво и не спеша.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-10 sm:gap-16">
@@ -53,7 +53,7 @@ export function Footer() {
         </div>
         <div className="mt-10 border-t border-brand-900 pt-6 text-center">
           <p className="text-xs text-brand-300">
-            © {new Date().getFullYear()} Глубина. Проект о психологии.
+            © {new Date().getFullYear()} Озода Турмухамедова. Проект о психологии.
           </p>
         </div>
       </div>

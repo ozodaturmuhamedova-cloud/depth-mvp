@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ErrorState } from '@/components/ErrorState'
@@ -48,10 +48,20 @@ function restoreChapter(slug: string): number {
 export default function BookReaderPage() {
   const params = useParams()
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug
-  const [currentChapter, setCurrentChapter] = useState(() => restoreChapter(slug ?? ''))
+  const [currentChapter, setCurrentChapter] = useState(0)
+
+  // Восстанавливаем главу из localStorage только после гидрации, чтобы
+  // серверный и первый клиентский рендер совпадали. Чтение внешнего API
+  // браузера (localStorage) не может быть вычислено во время рендера.
+  useEffect(() => {
+    if (!slug) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- значение приходит из localStorage (внешняя система), доступно только после монтирования
+    setCurrentChapter(restoreChapter(slug))
+  }, [slug])
 
   const { data, loading, error } = useFetch<ReadResponse>(
-    slug ? `/api/books/${slug}/read` : ''
+    `/api/books/${slug}/read`,
+    { skip: !slug }
   )
 
   const chapters = data?.content ? parseChapters(data.content) : []

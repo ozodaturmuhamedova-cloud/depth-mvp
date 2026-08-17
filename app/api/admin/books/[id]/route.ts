@@ -19,6 +19,9 @@ export async function PUT(
 
     const body = await request.json();
     const { slug, title, author, description, category, content, preview, cover_url } = body;
+    if (!slug || !title || !content) {
+      return NextResponse.json({ error: 'slug, title и content обязательны' }, { status: 400 });
+    }
     await run(
       `UPDATE books SET slug=?, title=?, author=?, description=?, category=?, content=?, preview=?, cover_url=?
        WHERE id=?`,

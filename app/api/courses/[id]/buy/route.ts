@@ -41,6 +41,9 @@ export async function POST(
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      return NextResponse.json({ error: 'Курс уже куплен' }, { status: 409 });
+    }
     console.error('Course buy error:', error);
     return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
   }

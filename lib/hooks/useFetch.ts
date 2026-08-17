@@ -24,6 +24,7 @@ export function useFetch<T>(url: string, options: UseFetchOptions = {}) {
     let ignore = false
 
     async function load() {
+      setLoading(true)
       try {
         const res = await fetch(url)
         if (ignore) return

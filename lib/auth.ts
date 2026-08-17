@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { get } from '@/lib/db';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-insecure-secret';
-if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+if (process.env.NODE_ENV !== 'development' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET must be set in environment variables');
 }
 

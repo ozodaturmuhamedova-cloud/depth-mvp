@@ -21,11 +21,19 @@ export async function GET() {
     WHERE cp.user_id = ?
   `, [userId]);
 
-  const courses = purchases.map((p) => ({
-    id: p.course_id,
-    title: p.title,
-    progress: JSON.parse(p.progress || '[]') as number[],
-  }));
+  const courses = purchases.map((p) => {
+    let progress: number[] = [];
+    try {
+      progress = JSON.parse(p.progress || '[]') as number[];
+    } catch {
+      progress = [];
+    }
+    return {
+      id: p.course_id,
+      title: p.title,
+      progress,
+    };
+  });
 
   return NextResponse.json({ courses });
 }

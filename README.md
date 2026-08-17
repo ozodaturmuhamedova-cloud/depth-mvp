@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Озода Турмухамедова — книги и курсы по психологии
 
-## Getting Started
+Платформа для чтения книг и прохождения курсов по психологии на Next.js 16 (App Router), React 19, Tailwind 4 и libSQL/Turso.
 
-First, run the development server:
+## Стек
+
+- **Next.js 16** (App Router, Route Handlers)
+- **React 19**
+- **Tailwind CSS 4**
+- **@libsql/client** — SQLite локально (`data.db`) или Turso в проде
+- Собственная авторизация: JWT в httpOnly-cookie, роли `user` / `admin`
+
+## Быстрый старт
+
+1. Установите зависимости:
+
+   ```bash
+   npm install
+   ```
+
+2. Скопируйте `.env.example` в `.env.local` и заполните значения (см. ниже).
+
+3. Запустите dev-сервер:
+
+   ```bash
+   npm run dev
+   ```
+
+   Откройте [http://localhost:3000](http://localhost:3000). Без `TURSO_DATABASE_URL` используется локальный файл `data.db`, схема и админ создаются автоматически при первом запросе.
+
+4. (Опционально) Засейте демо-данные книг и курсов:
+
+   ```bash
+   npm run seed
+   ```
+
+## Переменные окружения
+
+| Переменная | Обязательна | Описание |
+|---|---|---|
+| `JWT_SECRET` | В продакшене — да | Секрет для подписи JWT. Без него в production сервер не запустится. |
+| `ADMIN_EMAIL` | Нет | E-mail администратора (по умолчанию `admin@ozoda.app`). |
+| `ADMIN_PASSWORD` | Да, чтобы был админ | Пароль администратора; аккаунт создаётся автоматически при старте. |
+| `TURSO_DATABASE_URL` | Нет | URL базы Turso. Если не задан — используется локальный `file:./data.db`. |
+| `TURSO_AUTH_TOKEN` | Да, если задан `TURSO_DATABASE_URL` | Токен доступа к базе Turso. |
+
+## Админ-панель
+
+Вход как обычный пользователь через `/login` с `ADMIN_EMAIL`/`ADMIN_PASSWORD`, либо через отдельную форму пароля на `/admin`. После входа сессия сохраняется в cookie: `/admin` открывается сразу при следующих заходах, ссылка «Админ» появляется в шапке сайта.
+
+## Настройка Turso (прод)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+set TURSO_API_TOKEN=<токен из turso.tech>
+npm run setup:turso
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Скрипт создаёт (или переиспользует) базу `TURSO_DB_NAME` (по умолчанию `ozoda-books`) и печатает `TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` для `.env.local`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Перенести данные из локального `data.db` в Turso:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run migrate
+```
 
-## Learn More
+## Известные ограничения
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Подписки и покупка курсов (`/api/subscribe`, `/api/courses/[id]/buy`) выдаются сразу после запроса — платёжный провайдер в проекте не подключён. Это осознанное ограничение MVP.

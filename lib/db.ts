@@ -62,20 +62,45 @@ export const SCHEMA = `
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (course_id) REFERENCES courses(id)
   );
+
+  CREATE TABLE IF NOT EXISTS book_covers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    data BLOB NOT NULL,
+    mime TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `;
 
 async function initializeDatabase() {
   await db.executeMultiple(SCHEMA);
   await migrate();
+  // Использует db.execute напрямую (не get/run), чтобы не звать ensureInitialized()
+  // рекурсивно, пока сам initialized ещё не разрешился.
+  await ensureAdminUserInternal();
 }
 
 // Лёгкая миграция для уже существующих баз
 async function migrate() {
+  await db.execute('PRAGMA foreign_keys = ON');
+
   const res = await db.execute('PRAGMA table_info(users)');
   const userColumns = res.rows as unknown as { name: string }[];
   if (!userColumns.some((c) => c.name === 'role')) {
     await db.execute(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
   }
+
+  // Убираем дубликаты покупок курса, которые могли появиться до введения
+  // уникального индекса (иначе его создание ниже завершится ошибкой).
+  await db.execute(`
+    DELETE FROM course_purchases
+    WHERE id NOT IN (
+      SELECT MIN(id) FROM course_purchases GROUP BY user_id, course_id
+    )
+  `);
+  await db.execute(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_course_purchases_user_course ON course_purchases(user_id, course_id)'
+  );
 }
 
 // Ленивая инициализация схемы: выполняется один раз на инстанс функции
@@ -121,19 +146,29 @@ export async function run(sql: string, args: InValue[] = []): Promise<RunResult>
 }
 
 // Создаёт админа из переменных окружения, если его ещё нет.
-export async function ensureAdminUser(): Promise<void> {
-  const email = (process.env.ADMIN_EMAIL ?? 'admin@depth.app').trim().toLowerCase();
+// Вызывается из initializeDatabase() при старте, поэтому обращается к db напрямую.
+async function ensureAdminUserInternal(): Promise<void> {
+  const email = (process.env.ADMIN_EMAIL ?? 'admin@ozoda.app').trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
   if (!password) return;
 
-  const existing = await get<{ id: number }>('SELECT id FROM users WHERE role = ?', ['admin']);
-  if (existing) return;
+  const existingRes = await db.execute({
+    sql: 'SELECT id FROM users WHERE role = ?',
+    args: ['admin'],
+  });
+  if (existingRes.rows.length > 0) return;
 
   const passwordHash = await bcrypt.hash(password, 10);
-  await run(
-    'INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)',
-    [email, passwordHash, 'Admin', 'admin']
-  );
+  await db.execute({
+    sql: 'INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)',
+    args: [email, passwordHash, 'Admin', 'admin'],
+  });
+}
+
+// Публичная обёртка для вызова вне initializeDatabase() (например, из /api/admin/login).
+export async function ensureAdminUser(): Promise<void> {
+  await ensureInitialized();
+  await ensureAdminUserInternal();
 }
 
 export { LibsqlError };

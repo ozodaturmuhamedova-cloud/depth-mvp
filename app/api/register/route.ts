@@ -42,6 +42,9 @@ export async function POST(request: NextRequest) {
     setTokenCookie(response, token);
     return response;
   } catch (error) {
+    if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+      return NextResponse.json({ error: 'Пользователь с таким email уже существует' }, { status: 409 });
+    }
     console.error('Register error:', error);
     return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
   }

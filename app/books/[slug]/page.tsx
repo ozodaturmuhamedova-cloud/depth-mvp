@@ -39,7 +39,8 @@ export default function BookDetailPage() {
   const router = useRouter()
 
   const { data, loading, error } = useFetch<BookDetailResponse>(
-    slug ? `/api/books/${slug}` : ''
+    `/api/books/${slug}`,
+    { skip: !slug }
   )
 
   if (!slug) return <ErrorState message="Не указан идентификатор книги" />

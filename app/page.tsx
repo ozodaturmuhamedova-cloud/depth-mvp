@@ -52,9 +52,9 @@ export default function Home() {
           Психология без спешки
         </Badge>
         <h1 className="mx-auto max-w-3xl font-serif text-4xl font-bold leading-tight tracking-tight text-ink-900 sm:text-6xl">
-          Психология на{' '}
+          Психология{' '}
           <span className="relative whitespace-nowrap text-brand-600">
-            глубине
+            простыми словами
             <svg
               viewBox="0 0 200 12"
               fill="none"

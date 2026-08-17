@@ -5,7 +5,7 @@ import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 
 export const metadata: Metadata = {
-  title: 'Глубина — книги и курсы по психологии',
+  title: 'Озода Турмухамедова — книги и курсы по психологии',
   description: 'Платформа для чтения книг и прохождения курсов по психологии',
 }
 
