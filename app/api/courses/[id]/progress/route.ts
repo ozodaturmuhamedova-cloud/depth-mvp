@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { get, run } from '@/lib/db';
 import { getUserIdFromRequest } from '@/lib/auth';
+import { isTrustedOrigin } from '@/lib/csrf';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isTrustedOrigin(request)) {
+    return NextResponse.json({ error: 'Недопустимый источник запроса' }, { status: 403 });
+  }
   try {
     const userId = await getUserIdFromRequest();
     if (!userId) {

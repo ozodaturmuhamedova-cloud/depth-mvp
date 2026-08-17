@@ -17,15 +17,15 @@ export async function GET(
     }
 
     const { slug } = await params; // <-- await
-    const book = await get<{ content: string }>(
-      'SELECT content FROM books WHERE slug = ?',
+    const book = await get<{ content: string; content_format: 'text' | 'html' }>(
+      'SELECT content, content_format FROM books WHERE slug = ?',
       [slug]
     );
     if (!book) {
       return NextResponse.json({ error: 'Книга не найдена' }, { status: 404 });
     }
 
-    return NextResponse.json({ content: book.content });
+    return NextResponse.json({ content: book.content, format: book.content_format });
   } catch (error) {
     console.error('Book read error:', error);
     return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });

@@ -1,15 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { get, run } from '@/lib/db';
 import { getUserIdFromRequest } from '@/lib/auth';
+import { rateLimit } from '@/lib/rate-limit';
+import { isTrustedOrigin } from '@/lib/csrf';
+
+// См. app/api/subscribe/route.ts — платежи ещё не подключены, поэтому без
+// явного флага бесплатная "покупка" курса запрещена.
+const ALLOW_FREE_SUBSCRIPTIONS = process.env.ALLOW_FREE_SUBSCRIPTIONS === 'true';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isTrustedOrigin(request)) {
+    return NextResponse.json({ error: 'Недопустимый источник запроса' }, { status: 403 });
+  }
+
+  const limit = rateLimit(request, 'course-buy', 20, 15 * 60 * 1000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: 'Слишком много запросов. Попробуйте позже' },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+    );
+  }
+
   try {
     const userId = await getUserIdFromRequest();
     if (!userId) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
+    }
+
+    if (!ALLOW_FREE_SUBSCRIPTIONS) {
+      return NextResponse.json(
+        { error: 'Оплата курса временно недоступна. Обратитесь в поддержку' },
+        { status: 402 }
+      );
     }
 
     const { id } = await params; // <-- await

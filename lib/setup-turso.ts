@@ -104,13 +104,17 @@ async function main() {
     console.log(`База "${DB_NAME}" создана: ${hostname}`);
   }
 
-  // Токен доступа к базе
+  // Токен доступа к базе. Вечный токен с полным доступом (expiration=never)
+  // — серьёзный риск при утечке (лог CI, случайный коммит и т.п.), поэтому
+  // ограничиваем срок действия; обновляйте токен повторным запуском скрипта.
+  const TOKEN_EXPIRATION = process.env.TURSO_TOKEN_EXPIRATION ?? '90d';
   const tokenRes = await api(
-    `/v1/organizations/${org}/databases/${DB_NAME}/auth/tokens?expiration=never&authorization=full-access`,
+    `/v1/organizations/${org}/databases/${DB_NAME}/auth/tokens?expiration=${TOKEN_EXPIRATION}&authorization=full-access`,
     { method: 'POST' }
   );
 
-  console.log('\nЗапишите в .env.local:');
+  console.log(`\nТокен действителен ${TOKEN_EXPIRATION}. НЕ коммитьте его в git — только в .env.local (в .gitignore).`);
+  console.log('Запишите в .env.local:');
   console.log(`TURSO_DATABASE_URL=libsql://${hostname}`);
   console.log(`TURSO_AUTH_TOKEN=${tokenRes.jwt}`);
 }

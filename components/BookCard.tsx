@@ -4,12 +4,15 @@ import type { BookSummary } from '@/lib/types'
 import { Badge } from '@/components/ui/Badge'
 
 export function BookCard({ book }: { book: BookSummary }) {
+  // next/image разрешает только локальные хосты (см. next.config.ts), внешний
+  // URL уронит страницу рантайм-ошибкой — на всякий случай подстраховываемся.
+  const hasCover = !!book.cover_url && book.cover_url.startsWith('/')
   return (
     <div className="group flex flex-col overflow-hidden rounded-card border border-ink-200 bg-white shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-lift">
       <div className="relative aspect-[3/4] bg-ink-100">
-        {book.cover_url ? (
+        {hasCover ? (
           <Image
-            src={book.cover_url}
+            src={book.cover_url!}
             alt={book.title}
             fill
             sizes="(min-width:1024px) 33vw, (min-width:768px) 50vw, 100vw"

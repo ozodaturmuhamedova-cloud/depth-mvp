@@ -7,28 +7,28 @@ import { ErrorState } from '@/components/ErrorState'
 import { LoadingState } from '@/components/LoadingState'
 import { Button } from '@/components/ui/Button'
 import { useFetch } from '@/lib/hooks/useFetch'
-import type { ApiError } from '@/lib/types'
-
-interface Chapter {
-  title: string
-  content: string
-}
+import { parseTextChapters, splitHtmlChapters } from '@/lib/chapters'
+import type { ApiError, ContentFormat } from '@/lib/types'
 
 interface ReadResponse extends ApiError {
   content?: string
+  format?: ContentFormat
 }
 
-function parseChapters(content: string): Chapter[] {
-  return content
-    .split(/^## /m)
-    .filter(Boolean)
-    .map((chunk) => {
-      const lines = chunk.trim().split('\n')
-      return {
-        title: lines[0].replace(/^##\s*/, ''),
-        content: lines.slice(1).join('\n').trim(),
-      }
-    })
+// HTML приходит уже санитизированным на сервере (см. lib/docx.ts, применяется
+// повторно при каждом сохранении книги в /api/admin/books) и создаётся только
+// администратором — dangerouslySetInnerHTML здесь безопасен.
+interface DisplayChapter {
+  title: string
+  content?: string
+  html?: string
+}
+
+function buildChapters(content: string, format: ContentFormat): DisplayChapter[] {
+  if (format === 'html') {
+    return splitHtmlChapters(content).map((ch) => ({ title: ch.title, html: ch.html }))
+  }
+  return parseTextChapters(content).map((ch) => ({ title: ch.title, content: ch.content }))
 }
 
 function restoreChapter(slug: string): number {
@@ -64,7 +64,7 @@ export default function BookReaderPage() {
     { skip: !slug }
   )
 
-  const chapters = data?.content ? parseChapters(data.content) : []
+  const chapters = data?.content ? buildChapters(data.content, data.format ?? 'text') : []
 
   const handleChapterChange = (index: number) => {
     setCurrentChapter(index)
@@ -121,7 +121,14 @@ export default function BookReaderPage() {
         <h2 className="font-serif text-2xl font-bold text-ink-900 sm:text-3xl">
           {chapter.title}
         </h2>
-        <div className="prose-book mt-6">{chapter.content}</div>
+        {chapter.html !== undefined ? (
+          <div
+            className="prose-book-html mt-6"
+            dangerouslySetInnerHTML={{ __html: chapter.html }}
+          />
+        ) : (
+          <div className="prose-book mt-6">{chapter.content}</div>
+        )}
       </article>
 
       <div className="mt-6 flex items-center justify-between gap-3">

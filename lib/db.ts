@@ -1,3 +1,10 @@
+// Осознанно БЕЗ 'server-only': этот модуль импортируется не только из
+// приложения Next.js, но и напрямую через tsx в lib/seed.ts и lib/migrate.ts
+// (npm run seed / npm run migrate), которые выполняются вне рантайма React
+// Server Components — 'server-only' там всегда падает (условие exports
+// "react-server" не выставляется). В браузерный бандл этот модуль и так не
+// попадёт: он использует @libsql/client (сетевые сокеты/fs), несовместимый
+// с браузерным окружением.
 import { createClient, LibsqlError } from '@libsql/client';
 import type { InValue, Row } from '@libsql/client';
 import bcrypt from 'bcryptjs';
@@ -35,7 +42,8 @@ export const SCHEMA = `
     category TEXT,
     content TEXT NOT NULL,
     preview TEXT,
-    cover_url TEXT
+    cover_url TEXT,
+    content_format TEXT NOT NULL DEFAULT 'text'
   );
 
   CREATE TABLE IF NOT EXISTS courses (
@@ -90,6 +98,18 @@ async function migrate() {
     await db.execute(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
   }
 
+  const booksRes = await db.execute('PRAGMA table_info(books)');
+  const bookColumns = booksRes.rows as unknown as { name: string }[];
+  if (!bookColumns.some((c) => c.name === 'content_format')) {
+    await db.execute(`ALTER TABLE books ADD COLUMN content_format TEXT NOT NULL DEFAULT 'text'`);
+  }
+
+  // Обложки допускаются только как локальные файлы (/api/covers/...), см.
+  // next.config.ts (images.remotePatterns пуст). Чистим внешние URL,
+  // оставшиеся от старого сида (например, via.placeholder.com) — next/image
+  // упадёт рантайм-ошибкой на неразрешённом хосте.
+  await db.execute(`UPDATE books SET cover_url = NULL WHERE cover_url IS NOT NULL AND cover_url NOT LIKE '/%'`);
+
   // Убираем дубликаты покупок курса, которые могли появиться до введения
   // уникального индекса (иначе его создание ниже завершится ошибкой).
   await db.execute(`
@@ -101,14 +121,67 @@ async function migrate() {
   await db.execute(
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_course_purchases_user_course ON course_purchases(user_id, course_id)'
   );
+
+  // Не более одной активной подписки на пользователя — исключает дубли
+  // при параллельных запросах к /api/subscribe.
+  await db.execute(`
+    DELETE FROM subscriptions
+    WHERE id NOT IN (
+      SELECT MIN(id) FROM subscriptions GROUP BY user_id
+    )
+  `);
+  await db.execute(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id)'
+  );
+
+  // Гарантия единственного администратора на уровне БД: частичный уникальный
+  // индекс физически запрещает существование второй строки с role='admin'.
+  await db.execute(`
+    DELETE FROM users
+    WHERE role = 'admin' AND id NOT IN (
+      SELECT MIN(id) FROM users WHERE role = 'admin'
+    )
+  `);
+  await db.execute(
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_single_admin ON users(role) WHERE role = 'admin'`
+  );
 }
 
-// Ленивая инициализация схемы: выполняется один раз на инстанс функции
+// Удалённая Turso-база (HTTP-транспорт) иногда "засыпает" при простое —
+// первый запрос после паузы может не уложиться в таймаут fetch и упасть с
+// "TypeError: fetch failed", хотя соединение полностью рабочее. Ретраим
+// только сетевые/временные ошибки — реальные ошибки SQL (например, UNIQUE
+// constraint) не трогаем, чтобы не менять поведение обработки таких ошибок
+// выше по стеку (register/books/etc. проверяют текст сообщения).
+function isTransientNetworkError(err: unknown): boolean {
+  if (err instanceof TypeError && /fetch failed/i.test(err.message)) return true;
+  const cause = (err as { cause?: { code?: string } } | undefined)?.cause;
+  const code = cause?.code;
+  return !!code && ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET'].includes(code);
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 4, baseDelayMs = 300): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientNetworkError(err) || attempt === attempts - 1) throw err;
+      await new Promise((resolve) => setTimeout(resolve, baseDelayMs * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+// Ленивая инициализация схемы: выполняется один раз на инстанс функции.
+// initializeDatabase() состоит из идемпотентных операций (IF NOT EXISTS,
+// проверки перед INSERT), поэтому безопасно повторить её целиком при сбое.
 let initialized: Promise<void> | null = null;
 
 export function ensureInitialized(): Promise<void> {
   if (!initialized) {
-    initialized = initializeDatabase().catch((err) => {
+    initialized = withRetry(() => initializeDatabase()).catch((err) => {
       initialized = null;
       throw err;
     });
@@ -124,21 +197,21 @@ export interface RunResult {
 // SELECT c множеством строк
 export async function all<T = Row>(sql: string, args: InValue[] = []): Promise<T[]> {
   await ensureInitialized();
-  const res = await db.execute({ sql, args });
+  const res = await withRetry(() => db.execute({ sql, args }));
   return res.rows as unknown as T[];
 }
 
 // SELECT одной строки (undefined, если ничего нет)
 export async function get<T = Row>(sql: string, args: InValue[] = []): Promise<T | undefined> {
   await ensureInitialized();
-  const res = await db.execute({ sql, args });
+  const res = await withRetry(() => db.execute({ sql, args }));
   return res.rows[0] as unknown as T | undefined;
 }
 
 // INSERT / UPDATE / DELETE
 export async function run(sql: string, args: InValue[] = []): Promise<RunResult> {
   await ensureInitialized();
-  const res = await db.execute({ sql, args });
+  const res = await withRetry(() => db.execute({ sql, args }));
   return {
     changes: res.rowsAffected,
     lastInsertRowid: res.lastInsertRowid == null ? 0 : Number(res.lastInsertRowid),
@@ -159,13 +232,28 @@ async function ensureAdminUserInternal(): Promise<void> {
   if (existingRes.rows.length > 0) return;
 
   const passwordHash = await bcrypt.hash(password, 10);
-  await db.execute({
-    sql: 'INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)',
-    args: [email, passwordHash, 'Admin', 'admin'],
-  });
+  try {
+    await db.execute({
+      sql: 'INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)',
+      args: [email, passwordHash, 'Admin', 'admin'],
+    });
+  } catch (err) {
+    // ADMIN_EMAIL уже занят обычным пользователем — не роняем инициализацию
+    // всей БД, а повышаем существующего пользователя до admin.
+    if (err instanceof LibsqlError && err.message.includes('UNIQUE constraint failed')) {
+      await db.execute({
+        sql: 'UPDATE users SET password_hash = ?, role = ? WHERE email = ?',
+        args: [passwordHash, 'admin', email],
+      });
+      console.warn(`ensureAdminUser: email ${email} уже существовал, пользователь повышен до роли admin`);
+    } else {
+      throw err;
+    }
+  }
 }
 
-// Публичная обёртка для вызова вне initializeDatabase() (например, из /api/admin/login).
+// Публичная обёртка для вызова вне initializeDatabase(), если понадобится
+// пересоздать/повысить админа вручную вне цикла инициализации БД.
 export async function ensureAdminUser(): Promise<void> {
   await ensureInitialized();
   await ensureAdminUserInternal();

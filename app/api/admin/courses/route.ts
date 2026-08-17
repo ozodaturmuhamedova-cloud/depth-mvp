@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { all, run } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
+import { courseSchema, formatZodError } from '@/lib/validation';
+import { isTrustedOrigin } from '@/lib/csrf';
 
 interface CourseRow {
   id: number;
@@ -37,15 +39,16 @@ export async function POST(request: NextRequest) {
   if (!admin) {
     return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
   }
+  if (!isTrustedOrigin(request)) {
+    return NextResponse.json({ error: 'Недопустимый источник запроса' }, { status: 403 });
+  }
   try {
     const body = await request.json();
-    const { title, description, price_cents, lessons } = body;
-    if (!title || typeof price_cents !== 'number' || price_cents < 0 || !lessons) {
-      return NextResponse.json(
-        { error: 'title, price_cents (>= 0) и lessons обязательны' },
-        { status: 400 }
-      );
+    const parsed = courseSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
+    const { title, description, price_cents, lessons } = parsed.data;
     await run(
       `INSERT INTO courses (title, description, price_cents, lessons)
        VALUES (?, ?, ?, ?)`,

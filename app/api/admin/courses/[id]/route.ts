@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { run } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
+import { courseSchema, formatZodError } from '@/lib/validation';
+import { isTrustedOrigin } from '@/lib/csrf';
 
 export async function PUT(
   request: NextRequest,
@@ -10,6 +12,9 @@ export async function PUT(
   if (!admin) {
     return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
   }
+  if (!isTrustedOrigin(request)) {
+    return NextResponse.json({ error: 'Недопустимый источник запроса' }, { status: 403 });
+  }
   try {
     const { id } = await params;
     const courseId = parseInt(id);
@@ -17,13 +22,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Неверный ID курса' }, { status: 400 });
     }
     const body = await request.json();
-    const { title, description, price_cents, lessons } = body;
-    if (!title || typeof price_cents !== 'number' || price_cents < 0 || !lessons) {
-      return NextResponse.json(
-        { error: 'title, price_cents (>= 0) и lessons обязательны' },
-        { status: 400 }
-      );
+    const parsed = courseSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
+    const { title, description, price_cents, lessons } = parsed.data;
     await run(
       'UPDATE courses SET title=?, description=?, price_cents=?, lessons=? WHERE id=?',
       [title, description || null, price_cents, JSON.stringify(lessons), courseId]
@@ -41,6 +44,9 @@ export async function DELETE(
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
+  }
+  if (!isTrustedOrigin(request)) {
+    return NextResponse.json({ error: 'Недопустимый источник запроса' }, { status: 403 });
   }
   try {
     const { id } = await params;

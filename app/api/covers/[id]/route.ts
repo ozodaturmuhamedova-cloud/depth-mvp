@@ -28,6 +28,11 @@ export async function GET(
     headers: {
       'Content-Type': cover.mime,
       'Cache-Control': 'public, max-age=31536000, immutable',
+      // Браузер не должен угадывать/переинтерпретировать тип содержимого
+      // (защита от polyglot-файлов, замаскированных под изображение).
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Disposition': 'inline',
+      'Content-Security-Policy': "default-src 'none'",
     },
   });
 }

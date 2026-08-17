@@ -117,4 +117,110 @@
   .prose-book p + p {
     margin-top: 1rem;
   }
+
+  /* Типографика для книг, импортированных из .docx (HTML-контент).
+     В отличие от .prose-book, здесь НЕТ white-space: pre-wrap — переносы
+     строк управляются самой HTML-разметкой (p, br, li и т.д.). */
+  .prose-book-html {
+    font-family: var(--font-pt-serif), "Georgia", serif;
+    font-size: 1.15rem;
+    line-height: 1.9;
+    color: var(--color-ink-800);
+  }
+
+  .prose-book-html h2,
+  .prose-book-html h3,
+  .prose-book-html h4 {
+    margin-top: 1.75rem;
+    margin-bottom: 0.75rem;
+    font-weight: 700;
+    color: var(--color-ink-900);
+  }
+
+  .prose-book-html h2 {
+    font-size: 1.6rem;
+  }
+
+  .prose-book-html h3 {
+    font-size: 1.35rem;
+  }
+
+  .prose-book-html h4 {
+    font-size: 1.15rem;
+  }
+
+  .prose-book-html p + p {
+    margin-top: 1rem;
+  }
+
+  .prose-book-html ul,
+  .prose-book-html ol {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+  }
+
+  .prose-book-html ul {
+    list-style: disc;
+  }
+
+  .prose-book-html ol {
+    list-style: decimal;
+  }
+
+  .prose-book-html li + li {
+    margin-top: 0.375rem;
+  }
+
+  .prose-book-html blockquote {
+    margin: 1.25rem 0;
+    border-left: 3px solid var(--color-brand-300);
+    padding-left: 1rem;
+    color: var(--color-ink-600);
+    font-style: italic;
+  }
+
+  .prose-book-html table {
+    margin: 1.5rem 0;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+  }
+
+  .prose-book-html th,
+  .prose-book-html td {
+    border: 1px solid var(--color-ink-200);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+  }
+
+  .prose-book-html th {
+    background-color: var(--color-ink-50);
+    font-weight: 600;
+  }
+
+  .prose-book-html a {
+    color: var(--color-brand-600);
+    text-decoration: underline;
+  }
+
+  .prose-book-html code {
+    border-radius: 0.25rem;
+    background-color: var(--color-ink-100);
+    padding: 0.125rem 0.375rem;
+    font-size: 0.9em;
+  }
+
+  .prose-book-html pre {
+    margin: 1rem 0;
+    overflow-x: auto;
+    border-radius: 0.5rem;
+    background-color: var(--color-ink-900);
+    color: var(--color-ink-50);
+    padding: 1rem;
+  }
+
+  .prose-book-html pre code {
+    background-color: transparent;
+    padding: 0;
+  }
 }

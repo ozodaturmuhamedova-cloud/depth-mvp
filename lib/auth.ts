@@ -1,13 +1,19 @@
+import 'server-only';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { get } from '@/lib/db';
 
-const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-insecure-secret';
-if (process.env.NODE_ENV !== 'development' && !process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET must be set in environment variables');
-}
+// Секрет обязателен всегда, без dev-заглушек: слабый секрет в проде
+// позволяет подделывать JWT и выдавать себя за любого пользователя, включая админа.
+const JWT_SECRET: string = (() => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error('JWT_SECRET must be set in environment variables and be at least 32 characters long');
+  }
+  return secret;
+})();
 
 const TOKEN_EXPIRATION = '7d';
 
@@ -31,6 +37,11 @@ export async function hashPassword(password: string): Promise<string> {
 export async function comparePassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
+
+// Валидный по формату, но ни к какому реальному аккаунту не относящийся хеш.
+// Используется для холостого bcrypt.compare, когда пользователь не найден,
+// чтобы ответ /api/login не отличался по времени и не палил существование email.
+export const DUMMY_PASSWORD_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uJ8Sxr8OwHQpQdo9qF/GcQ9lVpKzldPu';
 
 export function createToken(userId: number): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });

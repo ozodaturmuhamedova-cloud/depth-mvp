@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { run } from '@/lib/db';
 import { requireAdmin } from '@/lib/auth';
+import { bookSchema, formatZodError } from '@/lib/validation';
+import { sanitizeBookHtml } from '@/lib/docx';
+import { isTrustedOrigin } from '@/lib/csrf';
 
 export async function PUT(
   request: NextRequest,
@@ -10,6 +13,9 @@ export async function PUT(
   if (!admin) {
     return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
   }
+  if (!isTrustedOrigin(request)) {
+    return NextResponse.json({ error: 'Недопустимый источник запроса' }, { status: 403 });
+  }
   try {
     const { id } = await params;
     const bookId = parseInt(id);
@@ -18,14 +24,17 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { slug, title, author, description, category, content, preview, cover_url } = body;
-    if (!slug || !title || !content) {
-      return NextResponse.json({ error: 'slug, title и content обязательны' }, { status: 400 });
+    const parsed = bookSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
+    const { slug, title, author, description, category, preview, cover_url, content_format } = parsed.data;
+    const content = content_format === 'html' ? sanitizeBookHtml(parsed.data.content) : parsed.data.content;
+
     await run(
-      `UPDATE books SET slug=?, title=?, author=?, description=?, category=?, content=?, preview=?, cover_url=?
+      `UPDATE books SET slug=?, title=?, author=?, description=?, category=?, content=?, preview=?, cover_url=?, content_format=?
        WHERE id=?`,
-      [slug, title, author || null, description || null, category || null, content, preview || null, cover_url || null, bookId]
+      [slug, title, author || null, description || null, category || null, content, preview || null, cover_url || null, content_format, bookId]
     );
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -43,6 +52,9 @@ export async function DELETE(
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
+  }
+  if (!isTrustedOrigin(request)) {
+    return NextResponse.json({ error: 'Недопустимый источник запроса' }, { status: 403 });
   }
   try {
     const { id } = await params;

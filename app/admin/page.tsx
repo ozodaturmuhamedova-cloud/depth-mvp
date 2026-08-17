@@ -1,13 +1,10 @@
-import { requireAdmin } from '@/lib/auth'
-import { AdminLoginForm } from './AdminLoginForm'
+import { requireAdminOrNotFound } from '@/lib/dal'
 import { AdminPanel } from './AdminPanel'
 
 export default async function AdminPage() {
-  const admin = await requireAdmin()
-
-  if (!admin) {
-    return <AdminLoginForm />
-  }
+  // Гость и обычный пользователь получают 404 — панель для них как будто
+  // не существует, вместо подсказки в виде отдельной формы входа.
+  await requireAdminOrNotFound()
 
   return <AdminPanel />
 }

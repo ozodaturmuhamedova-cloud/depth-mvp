@@ -16,6 +16,8 @@ export interface Lesson {
   content: string;
 }
 
+export type ContentFormat = 'text' | 'html';
+
 export interface BookSummary {
   id: number;
   slug: string;
@@ -25,6 +27,7 @@ export interface BookSummary {
   category: string | null;
   preview: string | null;
   cover_url: string | null;
+  content_format: ContentFormat;
 }
 
 export interface Book extends BookSummary {

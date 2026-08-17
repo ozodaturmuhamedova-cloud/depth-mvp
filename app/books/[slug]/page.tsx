@@ -8,7 +8,7 @@ import { LoadingState } from '@/components/LoadingState'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useFetch } from '@/lib/hooks/useFetch'
-import type { ApiError } from '@/lib/types'
+import type { ApiError, ContentFormat } from '@/lib/types'
 
 interface BookDetailResponse extends ApiError {
   book?: {
@@ -20,10 +20,11 @@ interface BookDetailResponse extends ApiError {
     preview: string | null
     cover_url: string | null
     category: string | null
+    content_format: ContentFormat
   }
 }
 
-function renderPreview(preview: string) {
+function renderTextPreview(preview: string) {
   return preview.split('\n').map((line, i) => {
     const match = line.match(/^#{2,3}\s+(.*)$/)
     if (match) {
@@ -70,7 +71,7 @@ export default function BookDetailPage() {
 
       <div className="mt-6 grid gap-8 sm:grid-cols-[minmax(0,230px)_1fr]">
         <div className="relative aspect-[3/4] overflow-hidden rounded-card bg-ink-100 shadow-lift">
-          {book.cover_url && (
+          {book.cover_url?.startsWith('/') && (
             <Image src={book.cover_url} alt={book.title} fill className="object-cover" />
           )}
         </div>
@@ -98,9 +99,16 @@ export default function BookDetailPage() {
       {book.preview && (
         <section className="mt-10">
           <h2 className="kicker mb-3">Бесплатный фрагмент</h2>
-          <div className="prose-book rounded-card border border-ink-200 bg-white p-6 shadow-card sm:p-8">
-            {renderPreview(book.preview)}
-          </div>
+          {book.content_format === 'html' ? (
+            <div
+              className="prose-book-html rounded-card border border-ink-200 bg-white p-6 shadow-card sm:p-8"
+              dangerouslySetInnerHTML={{ __html: book.preview }}
+            />
+          ) : (
+            <div className="prose-book rounded-card border border-ink-200 bg-white p-6 shadow-card sm:p-8">
+              {renderTextPreview(book.preview)}
+            </div>
+          )}
         </section>
       )}
     </div>
