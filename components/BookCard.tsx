@@ -3,6 +3,11 @@ import Link from 'next/link'
 import type { BookSummary } from '@/lib/types'
 import { Badge } from '@/components/ui/Badge'
 
+const LANGUAGE_LABELS: Record<BookSummary['language'], string> = {
+  ru: 'Рус',
+  uz: 'Ўзб',
+}
+
 export function BookCard({ book }: { book: BookSummary }) {
   // next/image разрешает только локальные хосты (см. next.config.ts), внешний
   // URL уронит страницу рантайм-ошибкой — на всякий случай подстраховываемся.
@@ -28,6 +33,9 @@ export function BookCard({ book }: { book: BookSummary }) {
             {book.category}
           </Badge>
         )}
+        <Badge variant="neutral" className="absolute right-3 top-3 bg-white/90 shadow-card backdrop-blur">
+          {LANGUAGE_LABELS[book.language]}
+        </Badge>
       </div>
       <div className="flex flex-1 flex-col p-5">
         <h2 className="font-serif text-lg font-bold leading-snug text-ink-900">{book.title}</h2>

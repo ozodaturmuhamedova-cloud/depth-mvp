@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { LoadingState } from '@/components/LoadingState'
+import { notifyAuthChanged } from '@/lib/auth-events'
 import { useFetch } from '@/lib/hooks/useFetch'
 import type { ApiError, User } from '@/lib/types'
 
@@ -68,6 +69,7 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     await fetch('/api/logout', { method: 'POST' })
+    notifyAuthChanged()
     router.push('/')
   }
 

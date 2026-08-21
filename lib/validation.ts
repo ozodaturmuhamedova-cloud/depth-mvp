@@ -60,6 +60,7 @@ export const bookSchema = z.object({
     .optional()
     .nullable(),
   content_format: z.enum(['text', 'html']).optional().default('text'),
+  language: z.enum(['ru', 'uz']).optional().default('ru'),
 });
 
 export const lessonSchema = z.object({
@@ -76,6 +77,20 @@ export const courseSchema = z.object({
 
 export const subscribeSchema = z.object({
   plan: z.enum(['month', 'year']),
+});
+
+export const siteSettingsSchema = z.object({
+  // Только локальный файл (/api/covers/...) — та же причина, что и у cover_url:
+  // next.config.ts не разрешает внешние хосты для next/image.
+  hero_image_url: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((v) => v === '' || v.startsWith('/'), 'Изображение должно быть локальным файлом (используйте загрузку)')
+    .optional()
+    .nullable(),
+  hero_author_name: z.string().trim().max(200).optional().nullable(),
+  hero_author_role: z.string().trim().max(300).optional().nullable(),
 });
 
 /**

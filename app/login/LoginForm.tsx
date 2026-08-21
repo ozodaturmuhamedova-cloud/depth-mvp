@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { notifyAuthChanged } from '@/lib/auth-events'
 import type { ApiError } from '@/lib/types'
 
 // Разрешаем редиректить только на относительные внутренние пути, чтобы
@@ -39,6 +40,7 @@ export function LoginForm() {
         setError(data.error ?? 'Ошибка входа')
         return
       }
+      notifyAuthChanged()
       router.push(safeNextPath(searchParams.get('next')))
       router.refresh()
     } catch {

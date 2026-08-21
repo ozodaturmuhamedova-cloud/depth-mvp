@@ -8,7 +8,12 @@ import { LoadingState } from '@/components/LoadingState'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useFetch } from '@/lib/hooks/useFetch'
-import type { ApiError, ContentFormat } from '@/lib/types'
+import type { ApiError, BookLanguage, ContentFormat } from '@/lib/types'
+
+const LANGUAGE_LABELS: Record<BookLanguage, string> = {
+  ru: 'Русский',
+  uz: 'Ўзбек тили',
+}
 
 interface BookDetailResponse extends ApiError {
   book?: {
@@ -21,6 +26,7 @@ interface BookDetailResponse extends ApiError {
     cover_url: string | null
     category: string | null
     content_format: ContentFormat
+    language: BookLanguage
   }
 }
 
@@ -76,7 +82,10 @@ export default function BookDetailPage() {
           )}
         </div>
         <div className="flex flex-col">
-          {book.category && <Badge variant="brand" className="self-start">{book.category}</Badge>}
+          <div className="flex flex-wrap gap-2">
+            {book.category && <Badge variant="brand">{book.category}</Badge>}
+            <Badge variant="neutral">{LANGUAGE_LABELS[book.language]}</Badge>
+          </div>
           <h1 className="mt-3 font-serif text-3xl font-bold leading-tight text-ink-900 sm:text-4xl">
             {book.title}
           </h1>

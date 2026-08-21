@@ -28,15 +28,15 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { slug, title, author, description, category, cover_url, content_format } = parsed.data;
+    const { slug, title, author, description, category, cover_url, content_format, language } = parsed.data;
     const content = content_format === 'html' ? sanitizeBookHtml(parsed.data.content) : parsed.data.content;
     const preview =
       content_format === 'html' && parsed.data.preview ? sanitizeBookHtml(parsed.data.preview) : parsed.data.preview;
 
     await run(
-      `UPDATE books SET slug=?, title=?, author=?, description=?, category=?, content=?, preview=?, cover_url=?, content_format=?
+      `UPDATE books SET slug=?, title=?, author=?, description=?, category=?, content=?, preview=?, cover_url=?, content_format=?, language=?
        WHERE id=?`,
-      [slug, title, author || null, description || null, category || null, content, preview || null, cover_url || null, content_format, bookId]
+      [slug, title, author || null, description || null, category || null, content, preview || null, cover_url || null, content_format, language, bookId]
     );
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -18,6 +18,8 @@ export interface Lesson {
 
 export type ContentFormat = 'text' | 'html';
 
+export type BookLanguage = 'ru' | 'uz';
+
 export interface BookSummary {
   id: number;
   slug: string;
@@ -28,6 +30,7 @@ export interface BookSummary {
   preview: string | null;
   cover_url: string | null;
   content_format: ContentFormat;
+  language: BookLanguage;
 }
 
 export interface Book extends BookSummary {
@@ -75,6 +78,12 @@ export interface ApiError {
 
 export interface BookListResponse {
   books: BookSummary[];
+}
+
+export interface SiteSettings {
+  hero_image_url: string | null;
+  hero_author_name: string | null;
+  hero_author_role: string | null;
 }
 
 export interface CourseListResponse {

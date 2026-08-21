@@ -43,7 +43,8 @@ export const SCHEMA = `
     content TEXT NOT NULL,
     preview TEXT,
     cover_url TEXT,
-    content_format TEXT NOT NULL DEFAULT 'text'
+    content_format TEXT NOT NULL DEFAULT 'text',
+    language TEXT NOT NULL DEFAULT 'ru'
   );
 
   CREATE TABLE IF NOT EXISTS courses (
@@ -78,6 +79,12 @@ export const SCHEMA = `
     size INTEGER NOT NULL,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS site_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `;
 
 async function initializeDatabase() {
@@ -103,6 +110,13 @@ async function migrate() {
   if (!bookColumns.some((c) => c.name === 'content_format')) {
     await db.execute(`ALTER TABLE books ADD COLUMN content_format TEXT NOT NULL DEFAULT 'text'`);
   }
+  if (!bookColumns.some((c) => c.name === 'language')) {
+    // DEFAULT 'ru' на уже существующей колонке присваивает всем текущим книгам
+    // русский язык автоматически, без отдельного UPDATE.
+    await db.execute(`ALTER TABLE books ADD COLUMN language TEXT NOT NULL DEFAULT 'ru'`);
+  }
+  // Подчищаем значения, которые могли попасть в обход схемы (ручные правки БД).
+  await db.execute(`UPDATE books SET language = 'ru' WHERE language IS NULL OR language NOT IN ('ru', 'uz')`);
 
   // Обложки допускаются только как локальные файлы (/api/covers/...), см.
   // next.config.ts (images.remotePatterns пуст). Чистим внешние URL,

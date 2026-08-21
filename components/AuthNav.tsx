@@ -1,12 +1,18 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
+import { onAuthChanged } from '@/lib/auth-events'
 import { useFetch } from '@/lib/hooks/useFetch'
 import type { ApiError, User } from '@/lib/types'
 
 export function AuthNav() {
-  const { data, loading } = useFetch<{ user: User } & ApiError>('/api/me')
+  const { data, loading, reload } = useFetch<{ user: User } & ApiError>('/api/me')
   const user = data?.user
+
+  // AuthNav живёт в корневом layout и не перемонтируется при переходах между
+  // страницами, поэтому после входа/выхода его нужно явно попросить обновиться.
+  useEffect(() => onAuthChanged(reload), [reload])
 
   if (loading) {
     return <div className="h-9 w-24 shrink-0" aria-hidden="true" />

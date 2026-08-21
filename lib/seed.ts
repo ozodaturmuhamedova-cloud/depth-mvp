@@ -5,8 +5,8 @@ async function main() {
   const booksCount = (await all<{ count: number }>('SELECT COUNT(*) as count FROM books'))[0]?.count ?? 0;
   if (booksCount === 0) {
     await run(
-      `INSERT INTO books (slug, title, author, description, category, content, preview, cover_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO books (slug, title, author, description, category, content, preview, cover_url, language)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         'psihologiya-vliyaniya',
         'Психология влияния',
@@ -17,13 +17,14 @@ async function main() {
         '## Глава 1. Оружие влияния\nТекст первой главы...',
         // Внешние плейсхолдеры больше не используются — next.config.ts сужает
         // remotePatterns, обложки загружаются через /api/admin/covers.
-        null
+        null,
+        'ru'
       ]
     );
 
     await run(
-      `INSERT INTO books (slug, title, author, description, category, content, preview, cover_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO books (slug, title, author, description, category, content, preview, cover_url, language)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         'myshlenie-bystroe-i-medlennoe',
         'Мышление быстрое и медленное',
@@ -32,7 +33,8 @@ async function main() {
         'Когнитивная психология',
         '## Часть 1. Две системы\nСодержание первой части...\n\n## Часть 2. Эвристики и искажения\nСодержание второй части...',
         '## Часть 1. Две системы\nСодержание первой части...',
-        null
+        null,
+        'ru'
       ]
     );
 

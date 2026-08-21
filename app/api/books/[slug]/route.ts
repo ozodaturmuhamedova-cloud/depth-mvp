@@ -9,7 +9,7 @@ export async function GET(
   try {
     const { slug } = await params; // <-- await
     const book = await get<BookSummary>(
-      `SELECT id, slug, title, author, description, category, preview, cover_url, content_format
+      `SELECT id, slug, title, author, description, category, preview, cover_url, content_format, language
        FROM books WHERE slug = ?`,
       [slug]
     );

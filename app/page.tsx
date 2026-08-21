@@ -1,6 +1,33 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { ButtonLink } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { all } from '@/lib/db'
+import type { SiteSettings } from '@/lib/types'
+
+// Герой-блок читает настройки на каждый запрос, чтобы фото/имя автора,
+// загруженные в админке, отображались сразу без пересборки страницы.
+export const dynamic = 'force-dynamic'
+
+async function getHeroSettings(): Promise<SiteSettings> {
+  const settings: SiteSettings = {
+    hero_image_url: null,
+    hero_author_name: null,
+    hero_author_role: null,
+  }
+  try {
+    const rows = await all<{ key: string; value: string }>('SELECT key, value FROM site_settings');
+    for (const row of rows) {
+      if (row.key === 'hero_image_url' || row.key === 'hero_author_name' || row.key === 'hero_author_role') {
+        settings[row.key] = row.value;
+      }
+    }
+  } catch (error) {
+    // Сбой БД не должен ронять главную страницу — просто рендерим герой без фото.
+    console.error('Hero settings load error:', error);
+  }
+  return settings;
+}
 
 const features = [
   {
@@ -35,10 +62,37 @@ const features = [
   },
 ]
 
-export default function Home() {
+export default async function Home() {
+  const hero = await getHeroSettings()
+  const hasHeroImage = !!hero.hero_image_url && hero.hero_image_url.startsWith('/')
+  const authorName = hero.hero_author_name || 'Озода Турмухамедова'
+  const authorRole = hero.hero_author_role || 'Психолог, автор книг'
+
+  const heading = (
+    <h1 className="max-w-3xl font-serif text-4xl font-bold leading-tight tracking-tight text-ink-900 sm:text-6xl">
+      Психология{' '}
+      <span className="relative whitespace-nowrap text-brand-600">
+        простыми словами
+        <svg
+          viewBox="0 0 200 12"
+          fill="none"
+          aria-hidden="true"
+          className="absolute -bottom-2 left-0 w-full text-lamp-400"
+        >
+          <path
+            d="M2 9c48-6 148-6 196 0"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
+        </svg>
+      </span>
+    </h1>
+  )
+
   return (
     <div className="py-4 sm:py-10">
-      <section className="relative overflow-hidden rounded-[2rem] border border-ink-200 bg-gradient-to-b from-white via-white to-brand-50 px-6 py-16 text-center sm:px-12 sm:py-24">
+      <section className="relative overflow-hidden rounded-[2rem] border border-ink-200 bg-gradient-to-b from-white via-white to-brand-50 px-6 py-16 sm:px-12 sm:py-24">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full border-[22px] border-brand-100/80"
@@ -48,40 +102,76 @@ export default function Home() {
           className="pointer-events-none absolute -bottom-24 -right-20 h-80 w-80 rounded-full border-[26px] border-lamp-400/20"
         />
 
-        <Badge variant="brand" className="mb-6">
-          Психология без спешки
-        </Badge>
-        <h1 className="mx-auto max-w-3xl font-serif text-4xl font-bold leading-tight tracking-tight text-ink-900 sm:text-6xl">
-          Психология{' '}
-          <span className="relative whitespace-nowrap text-brand-600">
-            простыми словами
-            <svg
-              viewBox="0 0 200 12"
-              fill="none"
-              aria-hidden="true"
-              className="absolute -bottom-2 left-0 w-full text-lamp-400"
-            >
-              <path
-                d="M2 9c48-6 148-6 196 0"
-                stroke="currentColor"
-                strokeWidth="4"
-                strokeLinecap="round"
+        {hasHeroImage ? (
+          <div className="relative grid items-center gap-10 lg:grid-cols-[1.1fr_minmax(0,380px)]">
+            <div>
+              <Badge variant="brand" className="mb-6">
+                Психология без спешки
+              </Badge>
+              {heading}
+              <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-600">
+                Читайте лучшие книги по психологии и проходите курсы от экспертов.
+                Начните прямо сейчас.
+              </p>
+              <div className="mt-10 flex flex-wrap items-center gap-3">
+                <ButtonLink href="/pricing" size="lg">
+                  Оформить подписку
+                </ButtonLink>
+                <ButtonLink href="/books" variant="outline" size="lg">
+                  Смотреть книги
+                </ButtonLink>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+                <Link href="/books?lang=ru" className="font-semibold text-brand-600 hover:text-brand-700">
+                  Книги на русском
+                </Link>
+                <Link href="/books?lang=uz" className="font-semibold text-brand-600 hover:text-brand-700">
+                  Ўзбек тилида китоблар
+                </Link>
+              </div>
+            </div>
+
+            <div className="relative mx-auto w-full max-w-[320px] lg:max-w-[380px]">
+              <div
+                aria-hidden="true"
+                className="absolute -inset-3 rounded-[2.5rem] border border-lamp-400/40"
               />
-            </svg>
-          </span>
-        </h1>
-        <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-600">
-          Читайте лучшие книги по психологии и проходите курсы от экспертов.
-          Начните прямо сейчас.
-        </p>
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <ButtonLink href="/pricing" size="lg">
-            Оформить подписку
-          </ButtonLink>
-          <ButtonLink href="/books" variant="outline" size="lg">
-            Смотреть книги
-          </ButtonLink>
-        </div>
+              <div className="relative aspect-[3/4] overflow-hidden rounded-[2rem] bg-ink-100 shadow-lift">
+                <Image
+                  src={hero.hero_image_url!}
+                  alt={authorName}
+                  fill
+                  preload
+                  sizes="(min-width:1024px) 380px, 90vw"
+                  className="object-cover object-top"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-950/75 to-transparent p-5">
+                  <p className="font-serif text-lg font-bold text-white">{authorName}</p>
+                  <p className="text-sm text-white/80">{authorRole}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="relative text-center">
+            <Badge variant="brand" className="mb-6">
+              Психология без спешки
+            </Badge>
+            <div className="mx-auto">{heading}</div>
+            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-600">
+              Читайте лучшие книги по психологии и проходите курсы от экспертов.
+              Начните прямо сейчас.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+              <ButtonLink href="/pricing" size="lg">
+                Оформить подписку
+              </ButtonLink>
+              <ButtonLink href="/books" variant="outline" size="lg">
+                Смотреть книги
+              </ButtonLink>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="mt-10 grid gap-6 md:grid-cols-2">

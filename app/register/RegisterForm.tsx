@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { notifyAuthChanged } from '@/lib/auth-events'
 import type { ApiError } from '@/lib/types'
 
 export function RegisterForm() {
@@ -36,6 +37,7 @@ export function RegisterForm() {
         setError(data.error ?? 'Ошибка регистрации')
         return
       }
+      notifyAuthChanged()
       router.push('/dashboard')
       router.refresh()
     } catch {
