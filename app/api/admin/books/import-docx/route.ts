@@ -4,7 +4,7 @@ import { convertDocxToHtml } from '@/lib/docx';
 import { rateLimit } from '@/lib/rate-limit';
 import { isTrustedOrigin } from '@/lib/csrf';
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 МБ
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 МБ — с запасом для очень больших книг
 const DOCX_MIME =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 // .docx — это ZIP-архив; первые 4 байта любого ZIP-файла всегда эта сигнатура.
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Поддерживаются только файлы .docx' }, { status: 400 });
     }
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: 'Размер файла не должен превышать 20 МБ' }, { status: 400 });
+      return NextResponse.json({ error: 'Размер файла не должен превышать 50 МБ' }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();

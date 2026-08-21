@@ -39,8 +39,17 @@ export const bookSchema = z.object({
   author: z.string().trim().max(300).optional().nullable(),
   description: z.string().trim().max(5000).optional().nullable(),
   category: z.string().trim().max(120).optional().nullable(),
-  content: z.string().min(1).max(2_000_000),
-  preview: z.string().max(200_000).optional().nullable(),
+  // Достаточно для очень крупных книг (для сравнения, «Война и мир» — около
+  // 3.2 млн символов). Пока лимит ниже, загрузка больших .docx падала с
+  // "Too big: expected string to have <=200000 characters".
+  content: z.string().min(1).max(10_000_000, 'Текст книги слишком большой (максимум 10 млн символов)'),
+  // Превью — это короткий бесплатный фрагмент на странице книги, а не вся
+  // книга целиком, но лимит держим с запасом на случай ручного редактирования.
+  preview: z
+    .string()
+    .max(20_000, 'Превью слишком длинное (максимум 20 000 символов) — оставьте только короткий фрагмент')
+    .optional()
+    .nullable(),
   // Только локальные файлы (/api/covers/...) — next.config.ts не разрешает
   // внешние хосты для next/image, внешний URL уронит страницу рантайм-ошибкой.
   cover_url: z

@@ -46,3 +46,25 @@ export function splitHtmlChapters(html: string): HtmlChapter[] {
     return { title: stripTags(match[1]).trim(), html: match[2] }
   })
 }
+
+// Дефолтный размер бесплатного фрагмента книги, автоматически заполняемого
+// при импорте .docx. Без этого лимита превью для книги без разбивки на главы
+// (или с одной огромной первой главой) получалось размером во всю книгу и
+// падало на серверной валидации (max(20_000) в lib/validation.ts).
+const DEFAULT_PREVIEW_MAX_CHARS = 4000
+
+// Обрезает HTML по границам блочных элементов (параграфы, заголовки, списки
+// и т.д.), а не посимвольно — иначе можно оборвать тег и сломать разметку.
+export function truncateHtmlPreview(html: string, maxChars = DEFAULT_PREVIEW_MAX_CHARS): string {
+  if (html.length <= maxChars) return html
+
+  const blocks = html.match(/<(p|h2|h3|h4|ul|ol|blockquote|table)[^>]*>[\s\S]*?<\/\1>|<hr\s*\/?>/gi)
+  if (!blocks || blocks.length === 0) return html.slice(0, maxChars)
+
+  let result = ''
+  for (const block of blocks) {
+    if (result && result.length + block.length > maxChars) break
+    result += block
+  }
+  return result || blocks[0]
+}

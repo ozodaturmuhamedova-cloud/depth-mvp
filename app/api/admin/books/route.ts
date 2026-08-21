@@ -32,11 +32,14 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { slug, title, author, description, category, preview, cover_url, content_format } = parsed.data;
+    const { slug, title, author, description, category, cover_url, content_format } = parsed.data;
     // Контент из .docx-импорта уже санитизирован на этапе конвертации, но
     // повторная санитизация здесь — независимая гарантия на случай, если
-    // клиент отредактировал HTML вручную перед сохранением.
+    // клиент отредактировал HTML вручную перед сохранением. Превью рендерится
+    // через dangerouslySetInnerHTML на странице книги, поэтому тоже санитизируем.
     const content = content_format === 'html' ? sanitizeBookHtml(parsed.data.content) : parsed.data.content;
+    const preview =
+      content_format === 'html' && parsed.data.preview ? sanitizeBookHtml(parsed.data.preview) : parsed.data.preview;
 
     await run(
       `INSERT INTO books (slug, title, author, description, category, content, preview, cover_url, content_format)

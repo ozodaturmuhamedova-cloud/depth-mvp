@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { LoadingState } from '@/components/LoadingState'
 import { TextArea } from '@/components/ui/TextArea'
 import { useFetch } from '@/lib/hooks/useFetch'
-import { splitHtmlChapters } from '@/lib/chapters'
+import { splitHtmlChapters, truncateHtmlPreview } from '@/lib/chapters'
 import type { ApiError, ContentFormat, Lesson } from '@/lib/types'
 
 interface AdminBook {
@@ -137,11 +137,14 @@ export function AdminPanel() {
       if (res.ok && data?.html) {
         // Превью тоже переводим в HTML (первая глава), иначе на странице книги
         // formatMismatch: content_format='html', а preview остался бы обычным текстом.
+        // Обрезаем до короткого фрагмента: для книг без глав (или с одной
+        // огромной первой главой) вся книга целиком не пролезала в лимит
+        // preview и валидация на сервере падала с "Too big: ...".
         const firstChapterHtml = splitHtmlChapters(data.html)[0]?.html ?? data.html
         setBookForm((prev) => ({
           ...prev,
           content: data.html!,
-          preview: firstChapterHtml,
+          preview: truncateHtmlPreview(firstChapterHtml),
           content_format: 'html',
           title: prev.title || data.title || prev.title,
         }))
