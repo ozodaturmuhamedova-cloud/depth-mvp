@@ -84,13 +84,25 @@ function ReaderContent() {
     [goToChapter, router, pathname]
   )
 
-  // Быстрая навигация по главам со стрелок клавиатуры.
+  // Быстрая навигация по главам со стрелок клавиатуры + блокировка
+  // горячих клавиш копирования/сохранения/печати текста книги.
   useEffect(() => {
     if (!initialized || chapters.length === 0) return
 
     function handleKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null
-      if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return
+      const isEditable = target && ['INPUT', 'TEXTAREA'].includes(target.tagName)
+
+      // Блокируем копирование, сохранение страницы и печать (текст книги —
+      // платный контент). Работает только против случайного/неопытного
+      // копирования — полноценной защиты от копирования в браузере не существует.
+      const key = e.key.toLowerCase()
+      if ((e.ctrlKey || e.metaKey) && ['c', 's', 'p', 'u'].includes(key)) {
+        e.preventDefault()
+        return
+      }
+
+      if (isEditable) return
 
       if (e.key === 'ArrowRight' && currentChapter < chapters.length - 1) {
         handleChapterChange(currentChapter + 1)
@@ -161,7 +173,13 @@ function ReaderContent() {
           </button>
         </div>
 
-        <article className="mt-6 rounded-card border border-ink-200 bg-white p-8 shadow-card sm:p-12">
+        <article
+          className="no-copy no-print mt-6 rounded-card border border-ink-200 bg-white p-8 shadow-card sm:p-12"
+          onContextMenu={(e) => e.preventDefault()}
+          onCopy={(e) => e.preventDefault()}
+          onCut={(e) => e.preventDefault()}
+          onDragStart={(e) => e.preventDefault()}
+        >
           <h2 className="font-serif text-2xl font-bold text-ink-900 sm:text-3xl">
             {chapter.title}
           </h2>
