@@ -45,11 +45,19 @@ export function sanitizeBookHtml(html: string): string {
   });
 }
 
+// Mammoth сопоставляет стили по точному названию, которое показывает сам
+// Word — оно зависит от языка интерфейса (например, «Heading 1» в английской
+// версии и «Заголовок 1» в русской). Перечисляем оба варианта, чтобы импорт
+// не зависел от локализации Word, в котором готовился документ.
 const HEADING_STYLE_MAP = [
   "p[style-name='Title'] => h2:fresh",
+  "p[style-name='Название'] => h2:fresh",
   "p[style-name='Heading 1'] => h2:fresh",
+  "p[style-name='Заголовок 1'] => h2:fresh",
   "p[style-name='Heading 2'] => h3:fresh",
+  "p[style-name='Заголовок 2'] => h3:fresh",
   "p[style-name='Heading 3'] => h4:fresh",
+  "p[style-name='Заголовок 3'] => h4:fresh",
 ];
 
 /**
