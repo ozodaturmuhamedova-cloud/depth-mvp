@@ -10,7 +10,8 @@ import { TextArea } from '@/components/ui/TextArea'
 import { notifyAuthChanged } from '@/lib/auth-events'
 import { useFetch } from '@/lib/hooks/useFetch'
 import { splitHtmlChapters, truncateHtmlPreview } from '@/lib/chapters'
-import type { ApiError, BookLanguage, ContentFormat, Lesson, SiteSettings } from '@/lib/types'
+import { UsersTab } from './UsersTab'
+import type { ApiError, BookLanguage, ContentFormat, SiteSettings } from '@/lib/types'
 
 const LANGUAGE_LABELS: Record<BookLanguage, string> = {
   ru: 'Русский',
@@ -35,8 +36,7 @@ interface AdminCourse {
   id: number
   title: string
   description: string | null
-  price_cents: number
-  lessons: Lesson[]
+  telegram_url: string | null
 }
 
 interface BooksResponse extends ApiError {
@@ -63,8 +63,7 @@ const emptyBookForm = {
 const emptyCourseForm = {
   title: '',
   description: '',
-  price_cents: 0,
-  lessons: '[]',
+  telegram_url: '',
 }
 
 const emptySettingsForm = {
@@ -79,7 +78,7 @@ interface SettingsResponse extends ApiError {
 
 export function AdminPanel() {
   const router = useRouter()
-  const [tab, setTab] = useState<'books' | 'courses' | 'home'>('books')
+  const [tab, setTab] = useState<'books' | 'courses' | 'home' | 'users'>('books')
   const [message, setMessage] = useState('')
   const [bookForm, setBookForm] = useState(emptyBookForm)
   const [courseForm, setCourseForm] = useState(emptyCourseForm)
@@ -296,19 +295,11 @@ export function AdminPanel() {
   const handleSaveCourse = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    let lessons: unknown
-    try {
-      lessons = JSON.parse(courseForm.lessons)
-    } catch {
-      setMessage('Уроки должны быть в формате JSON')
-      return
-    }
-
     const url = editingCourse ? `/api/admin/courses/${editingCourse.id}` : '/api/admin/courses'
     const res = await fetch(url, {
       method: editingCourse ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...courseForm, lessons }),
+      body: JSON.stringify(courseForm),
     })
     const data = (await res.json().catch(() => null)) as ApiError | null
     if (res.ok) {
@@ -325,8 +316,7 @@ export function AdminPanel() {
     setCourseForm({
       title: course.title,
       description: course.description ?? '',
-      price_cents: course.price_cents,
-      lessons: JSON.stringify(course.lessons, null, 2),
+      telegram_url: course.telegram_url ?? '',
     })
   }
 
@@ -341,7 +331,7 @@ export function AdminPanel() {
     }
   }
 
-  if (books.loading || courses.loading) {
+  if ((tab === 'books' || tab === 'courses') && (books.loading || courses.loading)) {
     return <LoadingState label="Загрузка данных..." />
   }
 
@@ -397,7 +387,18 @@ export function AdminPanel() {
         >
           Главная
         </Button>
+        <Button
+          variant={tab === 'users' ? 'primary' : 'outline'}
+          onClick={() => {
+            setTab('users')
+            setMessage('')
+          }}
+        >
+          Пользователи
+        </Button>
       </div>
+
+      {tab === 'users' && <UsersTab />}
 
       {tab === 'books' && (
         <div>
@@ -588,20 +589,9 @@ export function AdminPanel() {
               rows={2}
             />
             <Input
-              type="number"
-              placeholder="Цена в центах *"
-              value={courseForm.price_cents}
-              onChange={(e) =>
-                setCourseForm({ ...courseForm, price_cents: Number(e.target.value) })
-              }
-              required
-            />
-            <TextArea
-              placeholder="Уроки (JSON массив) *"
-              value={courseForm.lessons}
-              onChange={(e) => setCourseForm({ ...courseForm, lessons: e.target.value })}
-              className="font-mono text-sm"
-              rows={8}
+              placeholder="Ссылка на Telegram-канал * (https://t.me/...)"
+              value={courseForm.telegram_url}
+              onChange={(e) => setCourseForm({ ...courseForm, telegram_url: e.target.value })}
               required
             />
             <div className="flex gap-3">
@@ -625,10 +615,16 @@ export function AdminPanel() {
               >
                 <div className="min-w-0">
                   <strong className="text-ink-900">{course.title}</strong>
-                  <span className="text-sm text-ink-500">
-                    {' '}
-                    — ${(course.price_cents / 100).toFixed(2)}
-                  </span>
+                  {course.telegram_url && (
+                    <a
+                      href={course.telegram_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-2 text-sm text-brand-600 hover:underline"
+                    >
+                      {course.telegram_url}
+                    </a>
+                  )}
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <button

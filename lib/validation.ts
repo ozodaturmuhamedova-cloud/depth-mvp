@@ -63,20 +63,29 @@ export const bookSchema = z.object({
   language: z.enum(['ru', 'uz']).optional().default('ru'),
 });
 
-export const lessonSchema = z.object({
-  title: z.string().trim().min(1).max(300),
-  content: z.string().max(200_000),
-});
+const telegramUrlSchema = z
+  .string()
+  .trim()
+  .max(300)
+  .url('Некорректная ссылка')
+  .refine(
+    (v) => /^https:\/\/(t\.me|telegram\.me)\//i.test(v),
+    'Ссылка должна вести на Telegram (https://t.me/...)'
+  );
 
 export const courseSchema = z.object({
   title: z.string().trim().min(1).max(300),
   description: z.string().trim().max(5000).optional().nullable(),
-  price_cents: z.number().int().min(0).max(100_000_00),
-  lessons: z.array(lessonSchema).max(500),
+  telegram_url: telegramUrlSchema,
 });
 
-export const subscribeSchema = z.object({
-  plan: z.enum(['month', 'year']),
+// Выдача/продление подписки администратором: либо готовый план (месяц/год),
+// либо произвольное число дней — оба варианта считаются от текущего момента.
+export const grantSubscriptionSchema = z.object({
+  plan: z.enum(['month', 'year']).optional(),
+  days: z.number().int().min(1).max(3650).optional(),
+}).refine((v) => v.plan !== undefined || v.days !== undefined, {
+  message: 'Укажите план или количество дней',
 });
 
 export const siteSettingsSchema = z.object({

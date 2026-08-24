@@ -30,7 +30,8 @@ export const SCHEMA = `
     password_hash TEXT NOT NULL,
     name TEXT,
     role TEXT NOT NULL DEFAULT 'user',
-    created_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT (datetime('now')),
+    last_login_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS books (
@@ -51,8 +52,7 @@ export const SCHEMA = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     description TEXT,
-    price_cents INTEGER NOT NULL,
-    lessons TEXT NOT NULL
+    telegram_url TEXT
   );
 
   CREATE TABLE IF NOT EXISTS subscriptions (
@@ -61,15 +61,6 @@ export const SCHEMA = `
     plan TEXT NOT NULL,
     active_until TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS course_purchases (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    course_id INTEGER NOT NULL,
-    progress TEXT DEFAULT '[]',
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (course_id) REFERENCES courses(id)
   );
 
   CREATE TABLE IF NOT EXISTS book_covers (
@@ -104,6 +95,9 @@ async function migrate() {
   if (!userColumns.some((c) => c.name === 'role')) {
     await db.execute(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
   }
+  if (!userColumns.some((c) => c.name === 'last_login_at')) {
+    await db.execute(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
+  }
 
   const booksRes = await db.execute('PRAGMA table_info(books)');
   const bookColumns = booksRes.rows as unknown as { name: string }[];
@@ -124,20 +118,28 @@ async function migrate() {
   // упадёт рантайм-ошибкой на неразрешённом хосте.
   await db.execute(`UPDATE books SET cover_url = NULL WHERE cover_url IS NOT NULL AND cover_url NOT LIKE '/%'`);
 
-  // Убираем дубликаты покупок курса, которые могли появиться до введения
-  // уникального индекса (иначе его создание ниже завершится ошибкой).
-  await db.execute(`
-    DELETE FROM course_purchases
-    WHERE id NOT IN (
-      SELECT MIN(id) FROM course_purchases GROUP BY user_id, course_id
-    )
-  `);
-  await db.execute(
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_course_purchases_user_course ON course_purchases(user_id, course_id)'
-  );
+  // Курсы больше не продаются напрямую — только название, описание и ссылка
+  // на Telegram-канал. Старая схема (price_cents/lessons) и таблица покупок
+  // course_purchases пересобираются один раз, без ORM/миграционных файлов.
+  const coursesRes = await db.execute('PRAGMA table_info(courses)');
+  const courseColumns = coursesRes.rows as unknown as { name: string }[];
+  if (courseColumns.some((c) => c.name === 'price_cents')) {
+    await db.execute('DROP TABLE IF EXISTS course_purchases');
+    await db.execute(`
+      CREATE TABLE courses_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        telegram_url TEXT
+      )
+    `);
+    await db.execute('INSERT INTO courses_new (id, title, description) SELECT id, title, description FROM courses');
+    await db.execute('DROP TABLE courses');
+    await db.execute('ALTER TABLE courses_new RENAME TO courses');
+  }
 
   // Не более одной активной подписки на пользователя — исключает дубли
-  // при параллельных запросах к /api/subscribe.
+  // при параллельных запросах на выдачу подписки из админ-панели.
   await db.execute(`
     DELETE FROM subscriptions
     WHERE id NOT IN (

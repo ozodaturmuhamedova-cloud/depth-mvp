@@ -41,34 +41,24 @@ async function main() {
     console.log('Книги добавлены');
   }
 
-  // Курсы
+  // Курсы — теперь без цены и уроков, только описание и ссылка на Telegram-канал.
   const coursesCount = (await all<{ count: number }>('SELECT COUNT(*) as count FROM courses'))[0]?.count ?? 0;
   if (coursesCount === 0) {
     await run(
-      'INSERT INTO courses (title, description, price_cents, lessons) VALUES (?, ?, ?, ?)',
+      'INSERT INTO courses (title, description, telegram_url) VALUES (?, ?, ?)',
       [
         'Основы когнитивно-поведенческой терапии',
         'Научитесь применять техники КПТ в повседневной жизни.',
-        4999,
-        JSON.stringify([
-          { title: 'Введение в КПТ', content: 'Текст первого урока...' },
-          { title: 'Автоматические мысли', content: 'Текст второго урока...' },
-          { title: 'Работа с убеждениями', content: 'Текст третьего урока...' }
-        ])
+        'https://t.me/ozoda_kpt',
       ]
     );
 
     await run(
-      'INSERT INTO courses (title, description, price_cents, lessons) VALUES (?, ?, ?, ?)',
+      'INSERT INTO courses (title, description, telegram_url) VALUES (?, ?, ?)',
       [
         'Эмоциональный интеллект',
         'Развитие навыков понимания и управления эмоциями.',
-        3499,
-        JSON.stringify([
-          { title: 'Что такое эмоциональный интеллект?', content: 'Введение...' },
-          { title: 'Осознание своих эмоций', content: 'Техники осознания...' },
-          { title: 'Управление эмоциями', content: 'Методы регуляции...' }
-        ])
+        'https://t.me/ozoda_ei',
       ]
     );
 

@@ -20,7 +20,7 @@ export default function CoursesPage() {
       <PageHeader
         kicker="Обучение"
         title="Курсы"
-        subtitle="Практические программы с отслеживанием прогресса"
+        subtitle="Практические программы — подробности и материалы в Telegram-канале"
       />
       {courses.length === 0 ? (
         <div className="rounded-card border border-dashed border-ink-300 py-20 text-center text-ink-500">

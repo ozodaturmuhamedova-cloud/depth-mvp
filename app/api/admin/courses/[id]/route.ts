@@ -26,10 +26,10 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { title, description, price_cents, lessons } = parsed.data;
+    const { title, description, telegram_url } = parsed.data;
     await run(
-      'UPDATE courses SET title=?, description=?, price_cents=?, lessons=? WHERE id=?',
-      [title, description || null, price_cents, JSON.stringify(lessons), courseId]
+      'UPDATE courses SET title=?, description=?, telegram_url=? WHERE id=?',
+      [title, description || null, telegram_url, courseId]
     );
     return NextResponse.json({ success: true });
   } catch {
@@ -54,7 +54,6 @@ export async function DELETE(
     if (isNaN(courseId)) {
       return NextResponse.json({ error: 'Неверный ID курса' }, { status: 400 });
     }
-    await run('DELETE FROM course_purchases WHERE course_id = ?', [courseId]);
     await run('DELETE FROM courses WHERE id = ?', [courseId]);
     return NextResponse.json({ success: true });
   } catch {

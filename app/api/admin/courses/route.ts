@@ -8,8 +8,7 @@ interface CourseRow {
   id: number;
   title: string;
   description: string | null;
-  price_cents: number;
-  lessons: string;
+  telegram_url: string | null;
 }
 
 export async function GET() {
@@ -18,16 +17,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Доступ запрещён' }, { status: 403 });
   }
   try {
-    const rows = await all<CourseRow>('SELECT * FROM courses ORDER BY id DESC');
-    const courses = rows.map((row) => {
-      let lessons: unknown = [];
-      try {
-        lessons = JSON.parse(row.lessons);
-      } catch {
-        lessons = [];
-      }
-      return { ...row, lessons };
-    });
+    const courses = await all<CourseRow>('SELECT * FROM courses ORDER BY id DESC');
     return NextResponse.json({ courses });
   } catch {
     return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
@@ -48,11 +38,11 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { title, description, price_cents, lessons } = parsed.data;
+    const { title, description, telegram_url } = parsed.data;
     await run(
-      `INSERT INTO courses (title, description, price_cents, lessons)
-       VALUES (?, ?, ?, ?)`,
-      [title, description || null, price_cents, JSON.stringify(lessons)]
+      `INSERT INTO courses (title, description, telegram_url)
+       VALUES (?, ?, ?)`,
+      [title, description || null, telegram_url]
     );
     return NextResponse.json({ success: true }, { status: 201 });
   } catch {

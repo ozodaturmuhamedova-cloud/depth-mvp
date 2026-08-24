@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { get } from '@/lib/db';
+import { get, run } from '@/lib/db';
 import {
   comparePassword,
   createToken,
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = createToken(user.id);
+    await run(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`, [user.id]);
 
     const response = NextResponse.json({ user: { id: user.id, email: user.email } });
     setTokenCookie(response, token);

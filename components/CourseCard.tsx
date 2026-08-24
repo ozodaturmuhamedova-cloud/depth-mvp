@@ -1,10 +1,8 @@
 import type { CourseSummary } from '@/lib/types'
 import { Badge } from '@/components/ui/Badge'
-import { ButtonLink } from '@/components/ui/Button'
 
-export function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`
-}
+const linkClasses =
+  'inline-flex w-full items-center justify-center gap-2 rounded-lg border border-ink-300 bg-white px-5 py-2.5 text-sm font-semibold text-ink-800 transition-colors duration-150 hover:border-brand-500 hover:text-brand-700'
 
 export function CourseCard({ course }: { course: CourseSummary }) {
   return (
@@ -16,14 +14,16 @@ export function CourseCard({ course }: { course: CourseSummary }) {
       {course.description && (
         <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-600">{course.description}</p>
       )}
-      <div className="mt-5 flex items-end justify-between gap-3 border-t border-ink-100 pt-4">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-400">Цена</p>
-          <p className="text-lg font-bold text-ink-900">{formatPrice(course.price_cents)}</p>
-        </div>
-        <ButtonLink href={`/courses/${course.id}`} variant="outline" size="sm">
-          Подробнее
-        </ButtonLink>
+      <div className="mt-5 border-t border-ink-100 pt-4">
+        {course.telegram_url ? (
+          <a href={course.telegram_url} target="_blank" rel="noopener noreferrer" className={linkClasses}>
+            Перейти в Telegram
+          </a>
+        ) : (
+          <span className={`${linkClasses} cursor-not-allowed opacity-50`} aria-disabled="true">
+            Ссылка появится позже
+          </span>
+        )}
       </div>
     </div>
   )

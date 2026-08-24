@@ -115,7 +115,7 @@ export default async function Home() {
               </p>
               <div className="mt-10 flex flex-wrap items-center gap-3">
                 <ButtonLink href="/pricing" size="lg">
-                  Оформить подписку
+                  Тарифы подписки
                 </ButtonLink>
                 <ButtonLink href="/books" variant="outline" size="lg">
                   Смотреть книги
@@ -164,7 +164,7 @@ export default async function Home() {
             </p>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
               <ButtonLink href="/pricing" size="lg">
-                Оформить подписку
+                Тарифы подписки
               </ButtonLink>
               <ButtonLink href="/books" variant="outline" size="lg">
                 Смотреть книги

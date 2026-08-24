@@ -44,7 +44,7 @@ async function copyTable(name: string): Promise<void> {
 async function main() {
   await remote.executeMultiple(SCHEMA);
   // Порядок важен из-за внешних ключей
-  for (const table of ['users', 'books', 'courses', 'subscriptions', 'course_purchases', 'book_covers', 'site_settings']) {
+  for (const table of ['users', 'books', 'courses', 'subscriptions', 'book_covers', 'site_settings']) {
     await copyTable(table);
   }
   console.log('Миграция завершена');

@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { get } from '@/lib/db';
-import { getUserIdFromRequest, hasActiveSubscription } from '@/lib/auth';
+import { getCurrentUser, hasActiveSubscription } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const userId = await getUserIdFromRequest();
-    if (!userId) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: 'Не авторизован' }, { status: 401 });
     }
 
-    if (!(await hasActiveSubscription(userId))) {
+    // У администратора подписка всегда «активна» — доступ ко всем книгам
+    // без отдельной записи в таблице subscriptions.
+    if (user.role !== 'admin' && !(await hasActiveSubscription(user.id))) {
       return NextResponse.json({ error: 'Нет активной подписки' }, { status: 403 });
     }
 

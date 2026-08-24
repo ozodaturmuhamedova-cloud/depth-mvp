@@ -11,11 +11,6 @@ export interface UserRow extends User {
   role: 'user' | 'admin';
 }
 
-export interface Lesson {
-  title: string;
-  content: string;
-}
-
 export type ContentFormat = 'text' | 'html';
 
 export type BookLanguage = 'ru' | 'uz';
@@ -41,21 +36,7 @@ export interface CourseSummary {
   id: number;
   title: string;
   description: string | null;
-  price_cents: number;
-}
-
-export interface Course extends CourseSummary {
-  lessons: Lesson[];
-}
-
-export interface CourseWithProgress {
-  id: number;
-  title: string;
-  description: string | null;
-  price_cents: number;
-  purchased: boolean;
-  progress: number[];
-  lessons: Lesson[] | null;
+  telegram_url: string | null;
 }
 
 export interface SubscriptionRow {
@@ -63,13 +44,6 @@ export interface SubscriptionRow {
   user_id: number;
   plan: string;
   active_until: string;
-}
-
-export interface CoursePurchaseRow {
-  id: number;
-  user_id: number;
-  course_id: number;
-  progress: string;
 }
 
 export interface ApiError {
@@ -88,4 +62,32 @@ export interface SiteSettings {
 
 export interface CourseListResponse {
   courses: CourseSummary[];
+}
+
+export interface AdminUserListItem {
+  id: number;
+  email: string;
+  name: string | null;
+  role: 'user' | 'admin';
+  created_at: string;
+  last_login_at: string | null;
+  subscription_plan: string | null;
+  subscription_active_until: string | null;
+}
+
+export interface AdminUserListResponse {
+  users: AdminUserListItem[];
+  total: number;
+  page: number;
+  perPage: number;
+}
+
+export interface AdminUserDetail {
+  id: number;
+  email: string;
+  name: string | null;
+  role: 'user' | 'admin';
+  created_at: string;
+  last_login_at: string | null;
+  subscription: { plan: string; active_until: string } | null;
 }

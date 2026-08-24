@@ -4,7 +4,7 @@ import { all } from '@/lib/db';
 export async function GET() {
   try {
     const courses = await all(`
-      SELECT id, title, description, price_cents FROM courses
+      SELECT id, title, description, telegram_url FROM courses
     `);
     return NextResponse.json({ courses });
   } catch (error) {

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useSyncExternalStore } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/Badge'
 import { ButtonLink } from '@/components/ui/Button'
@@ -24,16 +23,6 @@ interface SubResponse extends ApiError {
   subscription: SubscriptionInfo | null
 }
 
-interface PurchasedCourse {
-  id: number
-  title: string
-  progress: number[]
-}
-
-interface CoursesResponse extends ApiError {
-  courses: PurchasedCourse[]
-}
-
 function subscribeToStorage(callback: () => void) {
   window.addEventListener('storage', callback)
   return () => window.removeEventListener('storage', callback)
@@ -54,7 +43,6 @@ export default function DashboardPage() {
   const router = useRouter()
   const me = useFetch<MeResponse>('/api/me')
   const subscription = useFetch<SubResponse>('/api/me/subscription')
-  const courses = useFetch<CoursesResponse>('/api/me/courses')
 
   const lastBookRaw = useSyncExternalStore(
     subscribeToStorage,
@@ -73,7 +61,7 @@ export default function DashboardPage() {
     router.push('/')
   }
 
-  if (me.loading || subscription.loading || courses.loading) {
+  if (me.loading || subscription.loading) {
     return <LoadingState label="Загрузка личного кабинета..." />
   }
 
@@ -81,7 +69,6 @@ export default function DashboardPage() {
   if (!user) return <p className="py-10 text-center text-ink-500">Пользователь не найден</p>
 
   const sub = subscription.data?.subscription ?? null
-  const myCourses = courses.data?.courses ?? []
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -117,9 +104,12 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="mt-4">
-              <p className="text-sm text-ink-600">Подписка даёт доступ ко всем книгам.</p>
-              <ButtonLink href="/pricing" variant="primary" className="mt-4">
-                Оформить подписку
+              <p className="text-sm text-ink-600">
+                Подписка даёт доступ ко всем книгам. Оформить её самостоятельно нельзя — обратитесь к
+                администратору.
+              </p>
+              <ButtonLink href="/pricing" variant="outline" className="mt-4">
+                Подробнее о тарифах
               </ButtonLink>
             </div>
           )}
@@ -143,53 +133,13 @@ export default function DashboardPage() {
       </div>
 
       <section className="mt-10">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-          <h2 className="font-serif text-2xl font-bold text-ink-900">Мои курсы</h2>
-          {myCourses.length > 0 && (
-            <span className="text-sm text-ink-500">
-              {myCourses.length} {myCourses.length === 1 ? 'курс' : myCourses.length < 5 ? 'курса' : 'курсов'}
-            </span>
-          )}
+        <div className="rounded-card border border-dashed border-ink-300 py-16 text-center">
+          <h2 className="font-serif text-2xl font-bold text-ink-900">Курсы</h2>
+          <p className="mt-2 text-ink-600">Материалы курсов и записи доступны в Telegram-каналах.</p>
+          <ButtonLink href="/courses" variant="outline" className="mt-4">
+            Смотреть курсы
+          </ButtonLink>
         </div>
-        {myCourses.length > 0 ? (
-          <div className="space-y-3">
-            {myCourses.map((c) => (
-              <div
-                key={c.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-ink-200 bg-white p-5 shadow-card"
-              >
-                <div>
-                  <h3 className="font-semibold text-ink-900">{c.title}</h3>
-                  <p className="mt-0.5 text-sm text-ink-500">
-                    Пройдено уроков: {c.progress.length}
-                  </p>
-                </div>
-                <Link
-                  href={`/courses/${c.id}`}
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 transition hover:text-brand-700"
-                >
-                  Перейти
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path
-                      d="M3 8h10m0 0-3.5-3.5M13 8 9.5 11.5"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </Link>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-card border border-dashed border-ink-300 py-16 text-center">
-            <p className="text-ink-600">Вы ещё не купили ни одного курса.</p>
-            <ButtonLink href="/courses" variant="outline" className="mt-4">
-              Смотреть курсы
-            </ButtonLink>
-          </div>
-        )}
       </section>
     </div>
   )
