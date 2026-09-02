@@ -1,17 +1,5 @@
 import { z } from 'zod';
 
-export const telegramAuthSchema = z.object({
-  id: z.coerce.number().int().positive(),
-  first_name: z.string().min(1).max(200),
-  last_name: z.string().max(200).optional(),
-  username: z.string().max(64).optional(),
-  photo_url: z.string().url().max(2000).optional(),
-  auth_date: z.coerce.number().int().positive(),
-  hash: z.string().min(1).max(128),
-});
-
-export type TelegramAuthData = z.infer<typeof telegramAuthSchema>;
-
 const slugSchema = z
   .string()
   .trim()

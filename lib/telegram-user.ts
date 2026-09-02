@@ -1,7 +1,7 @@
 import 'server-only';
 import { get, run } from '@/lib/db';
-import type { TelegramAuthData } from '@/lib/validation';
-import { buildTelegramDisplayName, getTelegramAdminId } from '@/lib/telegram-auth';
+import { getTelegramAdminId } from '@/lib/telegram-auth';
+import type { TelegramOidcClaims } from '@/lib/telegram-oidc';
 
 interface TelegramUser {
   id: number;
@@ -11,15 +11,16 @@ interface TelegramUser {
 // Ищет существующего пользователя по telegram_id или привязывает Telegram
 // к ранее созданному аккаунту (по username или legacy admin без telegram_id).
 export async function findOrLinkTelegramUser(
-  data: TelegramAuthData
+  data: TelegramOidcClaims
 ): Promise<{ user: TelegramUser; linked: boolean }> {
-  const displayName = buildTelegramDisplayName(data);
-  const telegramUsername = data.username ?? null;
-  const shouldBeAdmin = getTelegramAdminId() !== null && data.id === getTelegramAdminId();
+  const displayName = data.name;
+  const telegramUsername = data.username;
+  const telegramId = data.telegramId;
+  const shouldBeAdmin = getTelegramAdminId() !== null && telegramId === getTelegramAdminId();
 
   const byTelegramId = await get<TelegramUser>(
     'SELECT id, role FROM users WHERE telegram_id = ?',
-    [data.id]
+    [telegramId]
   );
   if (byTelegramId) {
     await run(
@@ -36,12 +37,12 @@ export async function findOrLinkTelegramUser(
       [telegramUsername]
     );
     if (byUsername) {
-      if (byUsername.telegram_id != null && byUsername.telegram_id !== data.id) {
+      if (byUsername.telegram_id != null && byUsername.telegram_id !== telegramId) {
         throw new Error('TELEGRAM_USERNAME_CONFLICT');
       }
       await run(
         `UPDATE users SET telegram_id = ?, telegram_username = ?, name = ?, last_login_at = datetime('now') WHERE id = ?`,
-        [data.id, telegramUsername, displayName, byUsername.id]
+        [telegramId, telegramUsername, displayName, byUsername.id]
       );
       const user = { id: byUsername.id, role: byUsername.role };
       await promoteAdminIfNeeded(user, shouldBeAdmin);
@@ -56,7 +57,7 @@ export async function findOrLinkTelegramUser(
     if (legacyAdmin) {
       await run(
         `UPDATE users SET telegram_id = ?, telegram_username = ?, name = ?, last_login_at = datetime('now') WHERE id = ?`,
-        [data.id, telegramUsername, displayName, legacyAdmin.id]
+        [telegramId, telegramUsername, displayName, legacyAdmin.id]
       );
       return { user: legacyAdmin, linked: true };
     }
@@ -70,7 +71,7 @@ export async function findOrLinkTelegramUser(
   const result = await run(
     `INSERT INTO users (telegram_id, telegram_username, name, role, last_login_at)
      VALUES (?, ?, ?, ?, datetime('now'))`,
-    [data.id, telegramUsername, displayName, role]
+    [telegramId, telegramUsername, displayName, role]
   );
 
   return { user: { id: result.lastInsertRowid, role }, linked: false };
