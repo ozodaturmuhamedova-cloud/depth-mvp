@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { get, run } from '@/lib/db';
 import { createToken, setTokenCookie, getUserIdFromRequest } from '@/lib/auth';
 import { telegramAuthSchema, formatZodError } from '@/lib/validation';
-import {
-  verifyTelegramAuth,
-  isTelegramAuthFresh,
-  buildTelegramDisplayName,
-  getTelegramAdminId,
-} from '@/lib/telegram-auth';
+import { verifyTelegramAuth, isTelegramAuthFresh, buildTelegramDisplayName } from '@/lib/telegram-auth';
+import { findOrLinkTelegramUser } from '@/lib/telegram-user';
 import { rateLimit } from '@/lib/rate-limit';
 import { isTrustedOrigin } from '@/lib/csrf';
 
@@ -46,41 +41,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Недействительные данные Telegram' }, { status: 401 });
     }
 
+    const { user } = await findOrLinkTelegramUser(data);
     const displayName = buildTelegramDisplayName(data);
     const telegramUsername = data.username ?? null;
-    const adminTelegramId = getTelegramAdminId();
-    const shouldBeAdmin = adminTelegramId !== null && data.id === adminTelegramId;
-
-    let user = await get<{ id: number; role: string }>(
-      'SELECT id, role FROM users WHERE telegram_id = ?',
-      [data.id]
-    );
-
-    if (user) {
-      await run(
-        `UPDATE users SET name = ?, telegram_username = ?, last_login_at = datetime('now') WHERE id = ?`,
-        [displayName, telegramUsername, user.id]
-      );
-
-      if (shouldBeAdmin && user.role !== 'admin') {
-        await run(`UPDATE users SET role = 'user' WHERE role = 'admin'`);
-        await run('UPDATE users SET role = ? WHERE id = ?', ['admin', user.id]);
-        user = { ...user, role: 'admin' };
-      }
-    } else {
-      const role = shouldBeAdmin ? 'admin' : 'user';
-
-      if (shouldBeAdmin) {
-        await run(`UPDATE users SET role = 'user' WHERE role = 'admin'`);
-      }
-
-      const result = await run(
-        `INSERT INTO users (telegram_id, telegram_username, name, role, last_login_at)
-         VALUES (?, ?, ?, ?, datetime('now'))`,
-        [data.id, telegramUsername, displayName, role]
-      );
-      user = { id: result.lastInsertRowid, role };
-    }
 
     const token = createToken(user.id);
     const response = NextResponse.json({
@@ -89,6 +52,12 @@ export async function POST(request: NextRequest) {
     setTokenCookie(response, token);
     return response;
   } catch (error) {
+    if (error instanceof Error && error.message === 'TELEGRAM_USERNAME_CONFLICT') {
+      return NextResponse.json(
+        { error: 'Этот Telegram-аккаунт уже привязан к другому пользователю' },
+        { status: 409 }
+      );
+    }
     console.error('Telegram auth error:', error);
     return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
   }

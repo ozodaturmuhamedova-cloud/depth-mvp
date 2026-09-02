@@ -13,7 +13,7 @@ function LoginContent() {
       <Card variant="elevated" className="p-8 sm:p-10">
         <div className="mb-8 text-center">
           <h1 className="font-serif text-2xl font-bold text-ink-900">Вход</h1>
-          <p className="mt-1.5 text-sm text-ink-500">Войдите через Telegram, чтобы продолжить</p>
+          <p className="mt-1.5 text-sm text-ink-500">Войдите через Telegram в свой аккаунт</p>
         </div>
         <TelegramLogin onError={setError} />
         {error && (

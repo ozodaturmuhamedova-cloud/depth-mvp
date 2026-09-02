@@ -108,7 +108,7 @@ export function TelegramLogin({ onError }: TelegramLoginProps) {
 
   const iframeSrc =
     mounted &&
-    `https://oauth.telegram.org/embed/${encodeURIComponent(botUsername)}?origin=${encodeURIComponent(window.location.origin)}&return_to=${encodeURIComponent(window.location.href)}&size=large&radius=8&request_access=write`
+    `https://oauth.telegram.org/embed/${encodeURIComponent(botUsername)}?origin=${encodeURIComponent(window.location.origin)}&return_to=${encodeURIComponent(window.location.href)}&size=large&radius=8&userpic=true`
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -127,10 +127,6 @@ export function TelegramLogin({ onError }: TelegramLoginProps) {
         )}
       </div>
       {loading && <p className="text-sm text-ink-500">Вход...</p>}
-      <p className="text-center text-xs leading-relaxed text-ink-500">
-        Если кнопка не появилась, в @BotFather выполните <strong>/setdomain</strong> и привяжите{' '}
-        <strong>localhost</strong> (для разработки) или ваш домен на продакшене.
-      </p>
     </div>
   )
 }
