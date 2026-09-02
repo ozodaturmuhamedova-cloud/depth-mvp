@@ -5,12 +5,12 @@ import type { AdminUserListItem } from '@/lib/types';
 
 type RoleFilter = 'all' | 'user' | 'admin';
 type SubFilter = 'all' | 'active' | 'none';
-type SortOption = 'created_desc' | 'created_asc' | 'email_asc';
+type SortOption = 'created_desc' | 'created_asc' | 'name_asc';
 
 const SORT_CLAUSES: Record<SortOption, string> = {
   created_desc: 'u.created_at DESC, u.id DESC',
   created_asc: 'u.created_at ASC, u.id ASC',
-  email_asc: 'u.email ASC',
+  name_asc: 'COALESCE(u.name, u.telegram_username, "") ASC',
 };
 
 const PER_PAGE_OPTIONS = [10, 25, 50];
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const sub: SubFilter = subParam === 'active' || subParam === 'none' ? subParam : 'all';
     const sortParam = searchParams.get('sort');
     const sort: SortOption =
-      sortParam === 'created_asc' || sortParam === 'email_asc' ? sortParam : 'created_desc';
+      sortParam === 'created_asc' || sortParam === 'name_asc' ? sortParam : 'created_desc';
 
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
     const requestedPerPage = parseInt(searchParams.get('perPage') ?? '25', 10);
@@ -48,7 +48,9 @@ export async function GET(request: NextRequest) {
     // Плейсхолдеры повторяются, где нужно одно и то же значение дважды —
     // драйвер biндит только позиционные `?`, без нумерованных `?NNN`.
     const whereClause = `
-      WHERE (? = '' OR u.email LIKE ? ESCAPE '\\' OR COALESCE(u.name, '') LIKE ? ESCAPE '\\')
+      WHERE (? = '' OR COALESCE(u.telegram_username, '') LIKE ? ESCAPE '\\'
+        OR COALESCE(u.name, '') LIKE ? ESCAPE '\\'
+        OR CAST(u.telegram_id AS TEXT) LIKE ? ESCAPE '\\')
         AND (? = 'all' OR u.role = ?)
         AND (
           ? = 'all'
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
           OR (? = 'none' AND (s.active_until IS NULL OR datetime(s.active_until) <= datetime('now')))
         )
     `;
-    const whereArgs = [q, likePattern, likePattern, role, role, sub, sub, sub];
+    const whereArgs = [q, likePattern, likePattern, likePattern, role, role, sub, sub, sub];
 
     const countRow = await get<{ total: number }>(
       `SELECT COUNT(*) AS total
@@ -68,7 +70,7 @@ export async function GET(request: NextRequest) {
     const total = countRow?.total ?? 0;
 
     const users = await all<AdminUserListItem>(
-      `SELECT u.id, u.email, u.name, u.role, u.created_at, u.last_login_at,
+      `SELECT u.id, u.telegram_id, u.telegram_username, u.email, u.name, u.role, u.created_at, u.last_login_at,
               s.plan AS subscription_plan, s.active_until AS subscription_active_until
        FROM users u
        LEFT JOIN subscriptions s ON s.user_id = u.id

@@ -7,7 +7,6 @@
 // с браузерным окружением.
 import { createClient, LibsqlError } from '@libsql/client';
 import type { InValue, Row } from '@libsql/client';
-import bcrypt from 'bcryptjs';
 
 const TURSO_URL = process.env.TURSO_DATABASE_URL;
 const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -26,8 +25,10 @@ export const db = createClient({
 export const SCHEMA = `
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
+    telegram_id INTEGER UNIQUE,
+    telegram_username TEXT,
+    email TEXT UNIQUE,
+    password_hash TEXT,
     name TEXT,
     role TEXT NOT NULL DEFAULT 'user',
     created_at TEXT DEFAULT (datetime('now')),
@@ -82,9 +83,6 @@ export const SCHEMA = `
 async function initializeDatabase() {
   await db.executeMultiple(SCHEMA);
   await migrate();
-  // Использует db.execute напрямую (не get/run), чтобы не звать ensureInitialized()
-  // рекурсивно, пока сам initialized ещё не разрешился.
-  await ensureAdminUserInternal();
 }
 
 // Лёгкая миграция для уже существующих баз
@@ -98,6 +96,42 @@ async function migrate() {
   }
   if (!userColumns.some((c) => c.name === 'last_login_at')) {
     await db.execute(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
+  }
+
+  // Миграция на Telegram-авторизацию: telegram_id, nullable email/password.
+  if (!userColumns.some((c) => c.name === 'telegram_id')) {
+    const tablesRes = await db.execute(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users', 'users_new')`
+    );
+    const tableNames = new Set(
+      (tablesRes.rows as unknown as { name: string }[]).map((row) => row.name)
+    );
+
+    if (tableNames.has('users_new') && !tableNames.has('users')) {
+      // Прерванная миграция: users уже удалён, остался только users_new.
+      await db.execute('ALTER TABLE users_new RENAME TO users');
+    } else {
+      await db.execute('DROP TABLE IF EXISTS users_new');
+      await db.execute(`
+        CREATE TABLE users_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          telegram_id INTEGER UNIQUE,
+          telegram_username TEXT,
+          email TEXT UNIQUE,
+          password_hash TEXT,
+          name TEXT,
+          role TEXT NOT NULL DEFAULT 'user',
+          created_at TEXT DEFAULT (datetime('now')),
+          last_login_at TEXT
+        )
+      `);
+      await db.execute(`
+        INSERT INTO users_new (id, email, password_hash, name, role, created_at, last_login_at)
+        SELECT id, email, password_hash, name, role, created_at, last_login_at FROM users
+      `);
+      await db.execute('DROP TABLE users');
+      await db.execute('ALTER TABLE users_new RENAME TO users');
+    }
   }
 
   const booksRes = await db.execute('PRAGMA table_info(books)');
@@ -242,45 +276,10 @@ export async function run(sql: string, args: InValue[] = []): Promise<RunResult>
   };
 }
 
-// Создаёт админа из переменных окружения, если его ещё нет.
-// Вызывается из initializeDatabase() при старте, поэтому обращается к db напрямую.
-async function ensureAdminUserInternal(): Promise<void> {
-  const email = (process.env.ADMIN_EMAIL ?? 'admin@ozoda.app').trim().toLowerCase();
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password) return;
-
-  const existingRes = await db.execute({
-    sql: 'SELECT id FROM users WHERE role = ?',
-    args: ['admin'],
-  });
-  if (existingRes.rows.length > 0) return;
-
-  const passwordHash = await bcrypt.hash(password, 10);
-  try {
-    await db.execute({
-      sql: 'INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)',
-      args: [email, passwordHash, 'Admin', 'admin'],
-    });
-  } catch (err) {
-    // ADMIN_EMAIL уже занят обычным пользователем — не роняем инициализацию
-    // всей БД, а повышаем существующего пользователя до admin.
-    if (err instanceof LibsqlError && err.message.includes('UNIQUE constraint failed')) {
-      await db.execute({
-        sql: 'UPDATE users SET password_hash = ?, role = ? WHERE email = ?',
-        args: [passwordHash, 'admin', email],
-      });
-      console.warn(`ensureAdminUser: email ${email} уже существовал, пользователь повышен до роли admin`);
-    } else {
-      throw err;
-    }
-  }
-}
-
 // Публичная обёртка для вызова вне initializeDatabase(), если понадобится
 // пересоздать/повысить админа вручную вне цикла инициализации БД.
 export async function ensureAdminUser(): Promise<void> {
   await ensureInitialized();
-  await ensureAdminUserInternal();
 }
 
 export { LibsqlError };

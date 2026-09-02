@@ -9,7 +9,7 @@ import { verifyToken } from '@/lib/auth';
 // роли всегда выполняется на сервере через lib/dal.ts — см. requireAdminOrNotFound
 // и requireUserOrRedirect, которые полагаются на данные из БД, а не только на JWT.
 
-const GUEST_ONLY_ROUTES = ['/login', '/register'];
+const GUEST_ONLY_ROUTES = ['/login'];
 const PROTECTED_PREFIXES = ['/dashboard', '/admin'];
 
 function isProtectedPath(pathname: string): boolean {

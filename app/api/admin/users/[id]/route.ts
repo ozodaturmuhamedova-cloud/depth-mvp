@@ -5,7 +5,9 @@ import type { AdminUserDetail } from '@/lib/types';
 
 interface UserRow {
   id: number;
-  email: string;
+  telegram_id: number | null;
+  telegram_username: string | null;
+  email: string | null;
   name: string | null;
   role: 'user' | 'admin';
   created_at: string;
@@ -34,7 +36,7 @@ export async function GET(
     }
 
     const user = await get<UserRow>(
-      'SELECT id, email, name, role, created_at, last_login_at FROM users WHERE id = ?',
+      'SELECT id, telegram_id, telegram_username, email, name, role, created_at, last_login_at FROM users WHERE id = ?',
       [userId]
     );
     if (!user) {

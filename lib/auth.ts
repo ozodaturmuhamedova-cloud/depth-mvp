@@ -1,10 +1,8 @@
 import 'server-only';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { get } from '@/lib/db';
-
 // Секрет обязателен всегда, без dev-заглушек: слабый секрет в проде
 // позволяет подделывать JWT и выдавать себя за любого пользователя, включая админа.
 const JWT_SECRET: string = (() => {
@@ -19,29 +17,13 @@ const TOKEN_EXPIRATION = '7d';
 
 export interface UserRow {
   id: number;
-  email: string;
+  telegram_id: number | null;
+  telegram_username: string | null;
+  email: string | null;
   name: string | null;
   role: string;
   created_at: string;
 }
-
-export function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-export async function hashPassword(password: string): Promise<string> {
-  const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(password, salt);
-}
-
-export async function comparePassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
-}
-
-// Валидный по формату, но ни к какому реальному аккаунту не относящийся хеш.
-// Используется для холостого bcrypt.compare, когда пользователь не найден,
-// чтобы ответ /api/login не отличался по времени и не палил существование email.
-export const DUMMY_PASSWORD_HASH = '$2a$10$CwTycUXWue0Thq9StjUM0uJ8Sxr8OwHQpQdo9qF/GcQ9lVpKzldPu';
 
 export function createToken(userId: number): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
@@ -88,7 +70,7 @@ export async function getCurrentUser(): Promise<UserRow | null> {
   const userId = await getUserIdFromRequest();
   if (!userId) return null;
   const user = await get<UserRow>(
-    'SELECT id, email, name, role, created_at FROM users WHERE id = ?',
+    'SELECT id, telegram_id, telegram_username, email, name, role, created_at FROM users WHERE id = ?',
     [userId]
   );
   return user ?? null;

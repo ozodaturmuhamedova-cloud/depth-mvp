@@ -1,30 +1,16 @@
 import { z } from 'zod';
 
-export const emailSchema = z
-  .email('Некорректный email')
-  .trim()
-  .toLowerCase()
-  .max(254);
-
-// Минимум 8 символов, хотя бы одна буква и одна цифра.
-export const passwordSchema = z
-  .string()
-  .min(8, 'Пароль должен быть минимум 8 символов')
-  .max(200)
-  .regex(/[a-zA-Zа-яА-Я]/, 'Пароль должен содержать хотя бы одну букву')
-  .regex(/[0-9]/, 'Пароль должен содержать хотя бы одну цифру');
-
-export const registerSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
-  name: z.string().trim().max(120).optional().nullable(),
+export const telegramAuthSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  first_name: z.string().min(1).max(200),
+  last_name: z.string().max(200).optional(),
+  username: z.string().max(64).optional(),
+  photo_url: z.string().url().max(2000).optional(),
+  auth_date: z.coerce.number().int().positive(),
+  hash: z.string().min(1).max(128),
 });
 
-export const loginSchema = z.object({
-  email: emailSchema,
-  // Для входа не ужесточаем требования к паролю — только проверяем, что он есть.
-  password: z.string().min(1, 'Пароль обязателен').max(200),
-});
+export type TelegramAuthData = z.infer<typeof telegramAuthSchema>;
 
 const slugSchema = z
   .string()

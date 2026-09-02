@@ -1,13 +1,15 @@
 export interface User {
   id: number;
-  email: string;
+  telegram_id: number | null;
+  telegram_username: string | null;
+  email: string | null;
   name: string | null;
   role: 'user' | 'admin';
   created_at: string;
 }
 
 export interface UserRow extends User {
-  password_hash: string;
+  password_hash: string | null;
   role: 'user' | 'admin';
 }
 
@@ -67,7 +69,9 @@ export interface CourseListResponse {
 
 export interface AdminUserListItem {
   id: number;
-  email: string;
+  telegram_id: number | null;
+  telegram_username: string | null;
+  email: string | null;
   name: string | null;
   role: 'user' | 'admin';
   created_at: string;
@@ -85,7 +89,9 @@ export interface AdminUserListResponse {
 
 export interface AdminUserDetail {
   id: number;
-  email: string;
+  telegram_id: number | null;
+  telegram_username: string | null;
+  email: string | null;
   name: string | null;
   role: 'user' | 'admin';
   created_at: string;

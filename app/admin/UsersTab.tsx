@@ -12,13 +12,23 @@ import type { AdminUserDetail, AdminUserListItem, AdminUserListResponse, ApiErro
 
 type RoleFilter = 'all' | 'user' | 'admin'
 type SubFilter = 'all' | 'active' | 'none'
-type SortOption = 'created_desc' | 'created_asc' | 'email_asc'
+type SortOption = 'created_desc' | 'created_asc' | 'name_asc'
 
 const PER_PAGE_OPTIONS = [10, 25, 50]
 
 const PLAN_LABEL: Record<string, string> = {
   month: 'Месяц',
   year: 'Год',
+}
+
+function formatTelegramUser(user: {
+  telegram_username: string | null
+  telegram_id: number | null
+  name: string | null
+}): string {
+  if (user.telegram_username) return `@${user.telegram_username}`
+  if (user.telegram_id) return `ID ${user.telegram_id}`
+  return user.name ?? '—'
 }
 
 function formatDate(value: string | null): string {
@@ -128,8 +138,8 @@ function UserDetailPanel({
         <div className="space-y-5">
           <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-ink-500">Email</dt>
-              <dd className="font-medium text-ink-900">{user.email}</dd>
+              <dt className="text-ink-500">Telegram</dt>
+              <dd className="font-medium text-ink-900">{formatTelegramUser(user)}</dd>
             </div>
             <div>
               <dt className="text-ink-500">Имя</dt>
@@ -248,7 +258,7 @@ export function UsersTab() {
       <div className="mb-5 grid grid-cols-1 gap-3 rounded-card border border-ink-200 bg-white p-4 shadow-card sm:grid-cols-2 lg:grid-cols-4">
         <Input
           label="Поиск"
-          placeholder="Email или имя"
+          placeholder="Имя, @username или Telegram ID"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value)
@@ -286,7 +296,7 @@ export function UsersTab() {
         >
           <option value="created_desc">Сначала новые</option>
           <option value="created_asc">Сначала старые</option>
-          <option value="email_asc">По email (А-Я)</option>
+          <option value="name_asc">По имени (А-Я)</option>
         </Select>
       </div>
 
@@ -304,7 +314,7 @@ export function UsersTab() {
               <table className="w-full min-w-[640px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-ink-200 text-ink-500">
-                    <th className="px-4 py-3 font-medium">Email</th>
+                    <th className="px-4 py-3 font-medium">Telegram</th>
                     <th className="px-4 py-3 font-medium">Имя</th>
                     <th className="px-4 py-3 font-medium">Роль</th>
                     <th className="px-4 py-3 font-medium">Регистрация</th>
@@ -315,7 +325,7 @@ export function UsersTab() {
                 <tbody>
                   {users.map((u) => (
                     <tr key={u.id} className="border-b border-ink-100 last:border-0">
-                      <td className="px-4 py-3 font-medium text-ink-900">{u.email}</td>
+                      <td className="px-4 py-3 font-medium text-ink-900">{formatTelegramUser(u)}</td>
                       <td className="px-4 py-3 text-ink-600">{u.name ?? '—'}</td>
                       <td className="px-4 py-3">
                         <Badge variant={u.role === 'admin' ? 'brand' : 'neutral'}>

@@ -1,10 +1,5 @@
-import { redirectIfAuthenticated } from '@/lib/dal'
-import { RegisterForm } from './RegisterForm'
+import { redirect } from 'next/navigation'
 
-export default async function RegisterPage() {
-  // Достоверная (не только по Proxy) проверка на сервере — авторизованный
-  // пользователь не должен видеть форму регистрации.
-  await redirectIfAuthenticated()
-
-  return <RegisterForm />
+export default function RegisterPage() {
+  redirect('/login')
 }

@@ -14,7 +14,6 @@ const sections = [
     title: 'Аккаунт',
     links: [
       { href: '/login', label: 'Вход' },
-      { href: '/register', label: 'Регистрация' },
       { href: '/dashboard', label: 'Личный кабинет' },
     ],
   },
