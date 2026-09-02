@@ -7,16 +7,17 @@ import type { NextConfig } from "next";
 const isDev = process.env.NODE_ENV === "development";
 const cspHeader = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self' 'unsafe-inline' https://telegram.org${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' blob: data:",
+  "img-src 'self' blob: data: https://telegram.org https://t.me",
   "font-src 'self'",
   "object-src 'none'",
-  "connect-src 'self'",
+  "connect-src 'self' https://oauth.telegram.org",
+  "frame-src 'self' https://oauth.telegram.org",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join('; ');
 
 const securityHeaders = [
