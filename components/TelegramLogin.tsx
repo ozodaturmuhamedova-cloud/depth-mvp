@@ -1,15 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { notifyAuthChanged } from '@/lib/auth-events'
 import type { ApiError } from '@/lib/types'
-
-declare global {
-  interface Window {
-    onTelegramAuth?: (user: Record<string, unknown>) => void
-  }
-}
 
 function safeNextPath(value: string | null): string {
   if (!value) return '/dashboard'
@@ -17,25 +11,41 @@ function safeNextPath(value: string | null): string {
   return value
 }
 
+function normalizeBotUsername(value: string | undefined): string | null {
+  if (!value) return null
+  const username = value.trim().replace(/^@/, '')
+  return username || null
+}
+
 interface TelegramLoginProps {
   onError: (message: string) => void
 }
 
 export function TelegramLogin({ onError }: TelegramLoginProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const nextPathRef = useRef('/dashboard')
+  const onErrorRef = useRef(onError)
   const [loading, setLoading] = useState(false)
-  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
+  const [mounted, setMounted] = useState(false)
+  const botUsername = normalizeBotUsername(process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME)
 
   useEffect(() => {
-    if (!botUsername || !containerRef.current) return
+    setMounted(true)
+  }, [])
 
-    const container = containerRef.current
+  useEffect(() => {
+    nextPathRef.current = safeNextPath(searchParams.get('next'))
+  }, [searchParams])
 
-    window.onTelegramAuth = async (user) => {
+  useEffect(() => {
+    onErrorRef.current = onError
+  }, [onError])
+
+  const handleAuth = useCallback(
+    async (user: Record<string, unknown>) => {
       setLoading(true)
-      onError('')
+      onErrorRef.current('')
 
       try {
         const res = await fetch('/api/auth/telegram', {
@@ -46,34 +56,47 @@ export function TelegramLogin({ onError }: TelegramLoginProps) {
         const data = (await res.json()) as ApiError
 
         if (!res.ok) {
-          onError(data.error ?? 'Ошибка входа через Telegram')
+          onErrorRef.current(data.error ?? 'Ошибка входа через Telegram')
           return
         }
 
         notifyAuthChanged()
-        router.push(safeNextPath(searchParams.get('next')))
+        router.push(nextPathRef.current)
         router.refresh()
       } catch {
-        onError('Сетевая ошибка')
+        onErrorRef.current('Сетевая ошибка')
       } finally {
         setLoading(false)
       }
+    },
+    [router]
+  )
+
+  useEffect(() => {
+    if (!botUsername) return
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== 'https://oauth.telegram.org') return
+
+      try {
+        const payload = JSON.parse(String(event.data)) as {
+          event?: string
+          result?: Record<string, unknown>
+        }
+        if (payload.event === 'auth_result' && payload.result) {
+          void handleAuth(payload.result)
+        }
+      } catch {
+        // ignore unrelated postMessage payloads
+      }
     }
 
-    const script = document.createElement('script')
-    script.src = 'https://telegram.org/js/telegram-widget.js?22'
-    script.async = true
-    script.setAttribute('data-telegram-login', botUsername)
-    script.setAttribute('data-size', 'large')
-    script.setAttribute('data-radius', '8')
-    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
-    container.appendChild(script)
+    window.addEventListener('message', onMessage)
 
     return () => {
-      delete window.onTelegramAuth
-      container.innerHTML = ''
+      window.removeEventListener('message', onMessage)
     }
-  }, [botUsername, onError, router, searchParams])
+  }, [botUsername, handleAuth])
 
   if (!botUsername) {
     return (
@@ -83,10 +106,31 @@ export function TelegramLogin({ onError }: TelegramLoginProps) {
     )
   }
 
+  const iframeSrc =
+    mounted &&
+    `https://oauth.telegram.org/embed/${encodeURIComponent(botUsername)}?origin=${encodeURIComponent(window.location.origin)}&return_to=${encodeURIComponent(window.location.href)}&size=large&radius=8&request_access=write`
+
   return (
     <div className="flex flex-col items-center gap-3">
-      <div ref={containerRef} className="flex justify-center" />
+      <div className="flex h-11 w-full max-w-[280px] justify-center">
+        {iframeSrc ? (
+          <iframe
+            id="telegram-login-iframe"
+            src={iframeSrc}
+            width="100%"
+            height="44"
+            style={{ border: 'none', overflow: 'hidden' }}
+            title="Войти через Telegram"
+          />
+        ) : (
+          <div className="h-11 w-full rounded-lg bg-ink-100" aria-hidden="true" />
+        )}
+      </div>
       {loading && <p className="text-sm text-ink-500">Вход...</p>}
+      <p className="text-center text-xs leading-relaxed text-ink-500">
+        Если кнопка не появилась, в @BotFather выполните <strong>/setdomain</strong> и привяжите{' '}
+        <strong>localhost</strong> (для разработки) или ваш домен на продакшене.
+      </p>
     </div>
   )
 }
