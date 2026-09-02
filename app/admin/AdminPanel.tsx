@@ -37,6 +37,7 @@ interface AdminCourse {
   title: string
   description: string | null
   telegram_url: string | null
+  language: BookLanguage
 }
 
 interface BooksResponse extends ApiError {
@@ -64,6 +65,7 @@ const emptyCourseForm = {
   title: '',
   description: '',
   telegram_url: '',
+  language: 'ru' as BookLanguage,
 }
 
 const emptySettingsForm = {
@@ -317,6 +319,7 @@ export function AdminPanel() {
       title: course.title,
       description: course.description ?? '',
       telegram_url: course.telegram_url ?? '',
+      language: course.language ?? 'ru',
     })
   }
 
@@ -594,6 +597,15 @@ export function AdminPanel() {
               onChange={(e) => setCourseForm({ ...courseForm, telegram_url: e.target.value })}
               required
             />
+            <Select
+              value={courseForm.language}
+              onChange={(e) =>
+                setCourseForm({ ...courseForm, language: e.target.value as BookLanguage })
+              }
+            >
+              <option value="ru">{LANGUAGE_LABELS.ru}</option>
+              <option value="uz">{LANGUAGE_LABELS.uz}</option>
+            </Select>
             <div className="flex gap-3">
               <Button type="submit" variant="success">
                 {editingCourse ? 'Обновить' : 'Добавить'}
@@ -615,6 +627,9 @@ export function AdminPanel() {
               >
                 <div className="min-w-0">
                   <strong className="text-ink-900">{course.title}</strong>
+                  <span className="ml-2 text-xs font-medium text-ink-500">
+                    {LANGUAGE_LABELS[course.language ?? 'ru']}
+                  </span>
                   {course.telegram_url && (
                     <a
                       href={course.telegram_url}

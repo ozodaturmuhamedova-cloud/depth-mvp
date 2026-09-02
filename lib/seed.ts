@@ -45,20 +45,22 @@ async function main() {
   const coursesCount = (await all<{ count: number }>('SELECT COUNT(*) as count FROM courses'))[0]?.count ?? 0;
   if (coursesCount === 0) {
     await run(
-      'INSERT INTO courses (title, description, telegram_url) VALUES (?, ?, ?)',
+      'INSERT INTO courses (title, description, telegram_url, language) VALUES (?, ?, ?, ?)',
       [
         'Основы когнитивно-поведенческой терапии',
         'Научитесь применять техники КПТ в повседневной жизни.',
         'https://t.me/ozoda_kpt',
+        'ru',
       ]
     );
 
     await run(
-      'INSERT INTO courses (title, description, telegram_url) VALUES (?, ?, ?)',
+      'INSERT INTO courses (title, description, telegram_url, language) VALUES (?, ?, ?, ?)',
       [
         'Эмоциональный интеллект',
         'Развитие навыков понимания и управления эмоциями.',
         'https://t.me/ozoda_ei',
+        'uz',
       ]
     );
 

@@ -26,10 +26,10 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { title, description, telegram_url } = parsed.data;
+    const { title, description, telegram_url, language } = parsed.data;
     await run(
-      'UPDATE courses SET title=?, description=?, telegram_url=? WHERE id=?',
-      [title, description || null, telegram_url, courseId]
+      'UPDATE courses SET title=?, description=?, telegram_url=?, language=? WHERE id=?',
+      [title, description || null, telegram_url, language, courseId]
     );
     return NextResponse.json({ success: true });
   } catch {

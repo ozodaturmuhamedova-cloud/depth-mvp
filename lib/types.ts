@@ -37,6 +37,7 @@ export interface CourseSummary {
   title: string;
   description: string | null;
   telegram_url: string | null;
+  language: BookLanguage;
 }
 
 export interface SubscriptionRow {

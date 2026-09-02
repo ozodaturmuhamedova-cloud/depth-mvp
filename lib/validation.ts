@@ -77,6 +77,7 @@ export const courseSchema = z.object({
   title: z.string().trim().min(1).max(300),
   description: z.string().trim().max(5000).optional().nullable(),
   telegram_url: telegramUrlSchema,
+  language: z.enum(['ru', 'uz']).optional().default('ru'),
 });
 
 // Выдача/продление подписки администратором: либо готовый план (месяц/год),

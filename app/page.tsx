@@ -128,6 +128,12 @@ export default async function Home() {
                 <Link href="/books?lang=uz" className="font-semibold text-brand-600 hover:text-brand-700">
                   Ўзбек тилида китоблар
                 </Link>
+                <Link href="/courses?lang=ru" className="font-semibold text-brand-600 hover:text-brand-700">
+                  Курсы на русском
+                </Link>
+                <Link href="/courses?lang=uz" className="font-semibold text-brand-600 hover:text-brand-700">
+                  Ўзбек тилида курслар
+                </Link>
               </div>
             </div>
 

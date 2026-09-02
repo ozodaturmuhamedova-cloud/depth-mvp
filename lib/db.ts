@@ -52,7 +52,8 @@ export const SCHEMA = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     description TEXT,
-    telegram_url TEXT
+    telegram_url TEXT,
+    language TEXT NOT NULL DEFAULT 'ru'
   );
 
   CREATE TABLE IF NOT EXISTS subscriptions (
@@ -137,6 +138,13 @@ async function migrate() {
     await db.execute('DROP TABLE courses');
     await db.execute('ALTER TABLE courses_new RENAME TO courses');
   }
+
+  const coursesResAfter = await db.execute('PRAGMA table_info(courses)');
+  const courseColumnsAfter = coursesResAfter.rows as unknown as { name: string }[];
+  if (!courseColumnsAfter.some((c) => c.name === 'language')) {
+    await db.execute(`ALTER TABLE courses ADD COLUMN language TEXT NOT NULL DEFAULT 'ru'`);
+  }
+  await db.execute(`UPDATE courses SET language = 'ru' WHERE language IS NULL OR language NOT IN ('ru', 'uz')`);
 
   // Не более одной активной подписки на пользователя — исключает дубли
   // при параллельных запросах на выдачу подписки из админ-панели.
