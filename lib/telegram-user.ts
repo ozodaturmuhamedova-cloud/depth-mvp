@@ -28,7 +28,7 @@ export async function findOrLinkTelegramUser(
       [displayName, telegramUsername, byTelegramId.id]
     );
     await promoteAdminIfNeeded(byTelegramId, shouldBeAdmin);
-    return { user: byTelegramId, linked: false };
+    return { user: { id: Number(byTelegramId.id), role: byTelegramId.role }, linked: false };
   }
 
   if (telegramUsername) {
@@ -44,7 +44,7 @@ export async function findOrLinkTelegramUser(
         `UPDATE users SET telegram_id = ?, telegram_username = ?, name = ?, last_login_at = datetime('now') WHERE id = ?`,
         [telegramId, telegramUsername, displayName, byUsername.id]
       );
-      const user = { id: byUsername.id, role: byUsername.role };
+      const user = { id: Number(byUsername.id), role: byUsername.role };
       await promoteAdminIfNeeded(user, shouldBeAdmin);
       return { user, linked: true };
     }
@@ -59,7 +59,7 @@ export async function findOrLinkTelegramUser(
         `UPDATE users SET telegram_id = ?, telegram_username = ?, name = ?, last_login_at = datetime('now') WHERE id = ?`,
         [telegramId, telegramUsername, displayName, legacyAdmin.id]
       );
-      return { user: legacyAdmin, linked: true };
+      return { user: { id: Number(legacyAdmin.id), role: legacyAdmin.role }, linked: true };
     }
   }
 
@@ -74,7 +74,7 @@ export async function findOrLinkTelegramUser(
     [telegramId, telegramUsername, displayName, role]
   );
 
-  return { user: { id: result.lastInsertRowid, role }, linked: false };
+  return { user: { id: Number(result.lastInsertRowid), role }, linked: false };
 }
 
 async function promoteAdminIfNeeded(user: TelegramUser, shouldBeAdmin: boolean): Promise<void> {

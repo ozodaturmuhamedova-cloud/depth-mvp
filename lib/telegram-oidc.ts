@@ -66,6 +66,14 @@ export function createOAuthState(): string {
 }
 
 export function buildRedirectUri(requestUrl: string): string {
+  const explicit = process.env.TELEGRAM_REDIRECT_URI?.trim();
+  if (explicit) return explicit;
+
+  const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (appUrl) {
+    return new URL('/api/auth/telegram/callback', appUrl.endsWith('/') ? appUrl : `${appUrl}/`).toString();
+  }
+
   return new URL('/api/auth/telegram/callback', requestUrl).toString();
 }
 
@@ -197,10 +205,15 @@ export async function exchangeCodeForClaims(
 
   const payload = await verifyRs256Jwt(tokenJson.id_token, clientId);
 
+  // Telegram Bot-API user id comes in `id` (profile scope). OIDC `sub` is a
+  // different opaque subject — never use it as telegram_id.
+  const rawId = payload.id;
   const telegramId =
-    typeof payload.id === 'number'
-      ? payload.id
-      : Number(payload.sub);
+    typeof rawId === 'number'
+      ? rawId
+      : typeof rawId === 'string'
+        ? Number(rawId)
+        : NaN;
 
   if (!Number.isInteger(telegramId) || telegramId <= 0) {
     throw new Error('INVALID_TELEGRAM_ID');

@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   try {
     const claims = await exchangeCodeForClaims(code, request.url, codeVerifier);
     const { user } = await findOrLinkTelegramUser(claims);
-    const token = createToken(user.id);
+    const token = createToken(Number(user.id));
     const response = NextResponse.redirect(new URL(next, request.url));
     setTokenCookie(response, token);
     clearOAuthCookies(response);
@@ -58,6 +58,13 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     if (error instanceof Error && error.message === 'TELEGRAM_USERNAME_CONFLICT') {
       return loginRedirect(request, next, 'Этот Telegram-аккаунт уже привязан к другому пользователю');
+    }
+    if (error instanceof Error && error.message === 'INVALID_TELEGRAM_ID') {
+      return loginRedirect(request, next, 'Telegram не вернул идентификатор пользователя (нужен scope profile)');
+    }
+    if (error instanceof Error && error.message.startsWith('TOKEN_EXCHANGE_FAILED:')) {
+      console.error('Telegram OIDC callback error:', error);
+      return loginRedirect(request, next, 'Не удалось обменять код Telegram. Проверьте Client ID/Secret и Redirect URL в BotFather');
     }
     console.error('Telegram OIDC callback error:', error);
     return loginRedirect(request, next, 'Не удалось войти через Telegram');

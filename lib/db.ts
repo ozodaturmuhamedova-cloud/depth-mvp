@@ -85,34 +85,48 @@ async function initializeDatabase() {
   await migrate();
 }
 
+function columnNames(rows: Row[]): string[] {
+  return rows.map((row) => {
+    const name = row.name ?? row[1];
+    return typeof name === 'string' ? name : String(name ?? '');
+  });
+}
+
 // Лёгкая миграция для уже существующих баз
 async function migrate() {
   await db.execute('PRAGMA foreign_keys = ON');
 
   const res = await db.execute('PRAGMA table_info(users)');
-  const userColumns = res.rows as unknown as { name: string }[];
-  if (!userColumns.some((c) => c.name === 'role')) {
+  const userColumns = columnNames(res.rows);
+  if (!userColumns.includes('role')) {
     await db.execute(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
   }
-  if (!userColumns.some((c) => c.name === 'last_login_at')) {
+  if (!userColumns.includes('last_login_at')) {
     await db.execute(`ALTER TABLE users ADD COLUMN last_login_at TEXT`);
   }
 
   // Миграция на Telegram-авторизацию: telegram_id, nullable email/password.
-  if (!userColumns.some((c) => c.name === 'telegram_id')) {
+  // Пересоздание таблицы ломается при FK на users (subscriptions и т.п.), если
+  // foreign_keys остаются ON — а на Turso HTTP каждый execute() может идти в
+  // отдельной сессии, поэтому PRAGMA + DROP должны быть в одном executeMultiple.
+  if (!userColumns.includes('telegram_id')) {
     const tablesRes = await db.execute(
       `SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users', 'users_new')`
     );
     const tableNames = new Set(
-      (tablesRes.rows as unknown as { name: string }[]).map((row) => row.name)
+      tablesRes.rows.map((row) => {
+        const name = row.name ?? row[0];
+        return typeof name === 'string' ? name : String(name ?? '');
+      })
     );
 
     if (tableNames.has('users_new') && !tableNames.has('users')) {
       // Прерванная миграция: users уже удалён, остался только users_new.
       await db.execute('ALTER TABLE users_new RENAME TO users');
     } else {
-      await db.execute('DROP TABLE IF EXISTS users_new');
-      await db.execute(`
+      await db.executeMultiple(`
+        PRAGMA foreign_keys = OFF;
+        DROP TABLE IF EXISTS users_new;
         CREATE TABLE users_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           telegram_id INTEGER UNIQUE,
@@ -123,23 +137,22 @@ async function migrate() {
           role TEXT NOT NULL DEFAULT 'user',
           created_at TEXT DEFAULT (datetime('now')),
           last_login_at TEXT
-        )
-      `);
-      await db.execute(`
+        );
         INSERT INTO users_new (id, email, password_hash, name, role, created_at, last_login_at)
-        SELECT id, email, password_hash, name, role, created_at, last_login_at FROM users
+        SELECT id, email, password_hash, name, role, created_at, last_login_at FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_new RENAME TO users;
+        PRAGMA foreign_keys = ON;
       `);
-      await db.execute('DROP TABLE users');
-      await db.execute('ALTER TABLE users_new RENAME TO users');
     }
   }
 
   const booksRes = await db.execute('PRAGMA table_info(books)');
-  const bookColumns = booksRes.rows as unknown as { name: string }[];
-  if (!bookColumns.some((c) => c.name === 'content_format')) {
+  const bookColumns = columnNames(booksRes.rows);
+  if (!bookColumns.includes('content_format')) {
     await db.execute(`ALTER TABLE books ADD COLUMN content_format TEXT NOT NULL DEFAULT 'text'`);
   }
-  if (!bookColumns.some((c) => c.name === 'language')) {
+  if (!bookColumns.includes('language')) {
     // DEFAULT 'ru' на уже существующей колонке присваивает всем текущим книгам
     // русский язык автоматически, без отдельного UPDATE.
     await db.execute(`ALTER TABLE books ADD COLUMN language TEXT NOT NULL DEFAULT 'ru'`);
@@ -157,25 +170,28 @@ async function migrate() {
   // на Telegram-канал. Старая схема (price_cents/lessons) и таблица покупок
   // course_purchases пересобираются один раз, без ORM/миграционных файлов.
   const coursesRes = await db.execute('PRAGMA table_info(courses)');
-  const courseColumns = coursesRes.rows as unknown as { name: string }[];
-  if (courseColumns.some((c) => c.name === 'price_cents')) {
-    await db.execute('DROP TABLE IF EXISTS course_purchases');
-    await db.execute(`
+  const courseColumns = columnNames(coursesRes.rows);
+  if (courseColumns.includes('price_cents')) {
+    await db.executeMultiple(`
+      PRAGMA foreign_keys = OFF;
+      DROP TABLE IF EXISTS course_purchases;
+      DROP TABLE IF EXISTS courses_new;
       CREATE TABLE courses_new (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT,
         telegram_url TEXT
-      )
+      );
+      INSERT INTO courses_new (id, title, description) SELECT id, title, description FROM courses;
+      DROP TABLE courses;
+      ALTER TABLE courses_new RENAME TO courses;
+      PRAGMA foreign_keys = ON;
     `);
-    await db.execute('INSERT INTO courses_new (id, title, description) SELECT id, title, description FROM courses');
-    await db.execute('DROP TABLE courses');
-    await db.execute('ALTER TABLE courses_new RENAME TO courses');
   }
 
   const coursesResAfter = await db.execute('PRAGMA table_info(courses)');
-  const courseColumnsAfter = coursesResAfter.rows as unknown as { name: string }[];
-  if (!courseColumnsAfter.some((c) => c.name === 'language')) {
+  const courseColumnsAfter = columnNames(coursesResAfter.rows);
+  if (!courseColumnsAfter.includes('language')) {
     await db.execute(`ALTER TABLE courses ADD COLUMN language TEXT NOT NULL DEFAULT 'ru'`);
   }
   await db.execute(`UPDATE courses SET language = 'ru' WHERE language IS NULL OR language NOT IN ('ru', 'uz')`);

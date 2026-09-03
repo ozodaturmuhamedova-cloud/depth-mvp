@@ -26,6 +26,9 @@ export interface UserRow {
 }
 
 export function createToken(userId: number): string {
+  if (!Number.isInteger(userId) || userId <= 0) {
+    throw new Error('INVALID_USER_ID');
+  }
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
 }
 
