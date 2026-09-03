@@ -60,11 +60,31 @@ export async function GET(request: NextRequest) {
       return loginRedirect(request, next, 'Этот Telegram-аккаунт уже привязан к другому пользователю');
     }
     if (error instanceof Error && error.message === 'INVALID_TELEGRAM_ID') {
-      return loginRedirect(request, next, 'Telegram не вернул идентификатор пользователя (нужен scope profile)');
+      return loginRedirect(
+        request,
+        next,
+        'Telegram не вернул id пользователя. В BotFather → Login Widget → Advanced выберите RS256 или ES256 (не ES256K/EdDSA) — они не отдают profile'
+      );
+    }
+    if (error instanceof Error && error.message.startsWith('UNSUPPORTED_JWT_ALG:')) {
+      return loginRedirect(
+        request,
+        next,
+        `Неподдерживаемый алгоритм подписи id_token (${error.message.slice('UNSUPPORTED_JWT_ALG:'.length)})`
+      );
     }
     if (error instanceof Error && error.message.startsWith('TOKEN_EXCHANGE_FAILED:')) {
+      const details = error.message.slice('TOKEN_EXCHANGE_FAILED:'.length);
       console.error('Telegram OIDC callback error:', error);
-      return loginRedirect(request, next, 'Не удалось обменять код Telegram. Проверьте Client ID/Secret и Redirect URL в BotFather');
+      const hint =
+        /scope|profile|es256k|eddsa|algorithm/i.test(details)
+          ? ' Если в BotFather Advanced стоит ES256K/EdDSA — переключите на RS256 (нужен scope profile).'
+          : '';
+      return loginRedirect(
+        request,
+        next,
+        `Не удалось обменять код Telegram (${details}). Проверьте Client ID/Secret и Redirect URL.${hint}`
+      );
     }
     console.error('Telegram OIDC callback error:', error);
     return loginRedirect(request, next, 'Не удалось войти через Telegram');

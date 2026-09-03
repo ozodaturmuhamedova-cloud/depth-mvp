@@ -1,10 +1,21 @@
 import 'server-only';
-import { createHash, createPublicKey, createVerify, randomBytes } from 'crypto';
+import {
+  createHash,
+  createPublicKey,
+  createVerify,
+  randomBytes,
+  verify as cryptoVerify,
+  type KeyObject,
+} from 'crypto';
 
 const ISSUER = 'https://oauth.telegram.org';
 const AUTH_URL = `${ISSUER}/auth`;
 const TOKEN_URL = `${ISSUER}/token`;
 const JWKS_URL = `${ISSUER}/.well-known/jwks.json`;
+
+/** Algorithms Telegram advertises in discovery / JWKS. */
+const SUPPORTED_ALGS = new Set(['RS256', 'ES256', 'EdDSA', 'ES256K'] as const);
+type TelegramJwtAlg = 'RS256' | 'ES256' | 'EdDSA' | 'ES256K';
 
 interface JwkKey {
   kty: string;
@@ -14,6 +25,7 @@ interface JwkKey {
   e?: string;
   crv?: string;
   x?: string;
+  y?: string;
 }
 
 interface JwksResponse {
@@ -86,6 +98,8 @@ export function buildAuthorizationUrl(options: {
   url.searchParams.set('client_id', getTelegramClientId());
   url.searchParams.set('redirect_uri', buildRedirectUri(options.requestUrl));
   url.searchParams.set('response_type', 'code');
+  // profile нужен для claim `id` (Bot-API user id). ES256K/EdDSA в BotFather
+  // Advanced несовместимы с profile — там нужен RS256 или ES256.
   url.searchParams.set('scope', 'openid profile');
   url.searchParams.set('state', options.state);
   url.searchParams.set('code_challenge', options.codeChallenge);
@@ -99,7 +113,10 @@ async function getJwks(): Promise<JwksResponse> {
     return jwksCache;
   }
 
-  const res = await fetch(JWKS_URL, { next: { revalidate: 3600 } });
+  const res = await fetch(JWKS_URL, {
+    headers: { Accept: 'application/json' },
+    next: { revalidate: 3600 },
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch Telegram JWKS: ${res.status}`);
   }
@@ -113,7 +130,51 @@ function decodePart(part: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as Record<string, unknown>;
 }
 
-async function verifyRs256Jwt(idToken: string, clientId: string): Promise<Record<string, unknown>> {
+function findJwk(jwks: JwksResponse, kid: string, alg: TelegramJwtAlg): JwkKey | undefined {
+  return jwks.keys.find((key) => key.kid === kid && (!key.alg || key.alg === alg));
+}
+
+function publicKeyFromJwk(jwk: JwkKey, alg: TelegramJwtAlg): KeyObject {
+  if (alg === 'RS256') {
+    if (jwk.kty !== 'RSA' || !jwk.n || !jwk.e) {
+      throw new Error('JWK_NOT_FOUND');
+    }
+    return createPublicKey({
+      key: { kty: 'RSA', n: jwk.n, e: jwk.e },
+      format: 'jwk',
+    });
+  }
+
+  if (alg === 'ES256' || alg === 'ES256K') {
+    const expectedCrv = alg === 'ES256' ? 'P-256' : 'secp256k1';
+    if (jwk.kty !== 'EC' || jwk.crv !== expectedCrv || !jwk.x || !jwk.y) {
+      throw new Error('JWK_CURVE_MISMATCH');
+    }
+    return createPublicKey({
+      key: { kty: 'EC', crv: jwk.crv, x: jwk.x, y: jwk.y },
+      format: 'jwk',
+    });
+  }
+
+  // EdDSA / Ed25519
+  if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || !jwk.x) {
+    throw new Error('JWK_NOT_FOUND');
+  }
+  return createPublicKey({
+    key: { kty: 'OKP', crv: 'Ed25519', x: jwk.x },
+    format: 'jwk',
+  });
+}
+
+/**
+ * Ручная проверка id_token по JWKS Telegram:
+ * RS256, ES256 (P-256), EdDSA (Ed25519), ES256K (secp256k1).
+ * ECDSA-подписи в JWT — IEEE P1363 (r||s), не DER.
+ */
+export async function verifyTelegramIdToken(
+  idToken: string,
+  clientId: string
+): Promise<Record<string, unknown>> {
   const parts = idToken.split('.');
   if (parts.length !== 3) {
     throw new Error('INVALID_ID_TOKEN');
@@ -123,9 +184,11 @@ async function verifyRs256Jwt(idToken: string, clientId: string): Promise<Record
   const header = decodePart(encodedHeader);
   const payload = decodePart(encodedPayload);
 
-  if (header.alg !== 'RS256') {
-    throw new Error('UNSUPPORTED_JWT_ALG');
+  const alg = header.alg;
+  if (typeof alg !== 'string' || !SUPPORTED_ALGS.has(alg as TelegramJwtAlg)) {
+    throw new Error(`UNSUPPORTED_JWT_ALG:${String(alg)}`);
   }
+  const jwtAlg = alg as TelegramJwtAlg;
 
   const kid = typeof header.kid === 'string' ? header.kid : null;
   if (!kid) {
@@ -133,21 +196,52 @@ async function verifyRs256Jwt(idToken: string, clientId: string): Promise<Record
   }
 
   const jwks = await getJwks();
-  const jwk = jwks.keys.find((key) => key.kid === kid && key.kty === 'RSA');
-  if (!jwk?.n || !jwk.e) {
-    throw new Error('JWK_NOT_FOUND');
+  const jwk = findJwk(jwks, kid, jwtAlg);
+  if (!jwk) {
+    // Ключ мог ротироваться — сбросим кэш и попробуем ещё раз.
+    jwksCache = null;
+    jwksFetchedAt = 0;
+    const fresh = await getJwks();
+    const retry = findJwk(fresh, kid, jwtAlg);
+    if (!retry) {
+      throw new Error('JWK_NOT_FOUND');
+    }
+    return verifyWithJwk(encodedHeader, encodedPayload, encodedSignature, payload, clientId, jwtAlg, retry);
   }
 
-  const publicKey = createPublicKey({
-    key: { kty: 'RSA', n: jwk.n, e: jwk.e },
-    format: 'jwk',
-  });
-  const verifier = createVerify('RSA-SHA256');
-  verifier.update(`${encodedHeader}.${encodedPayload}`);
-  verifier.end();
+  return verifyWithJwk(encodedHeader, encodedPayload, encodedSignature, payload, clientId, jwtAlg, jwk);
+}
 
+function verifyWithJwk(
+  encodedHeader: string,
+  encodedPayload: string,
+  encodedSignature: string,
+  payload: Record<string, unknown>,
+  clientId: string,
+  alg: TelegramJwtAlg,
+  jwk: JwkKey
+): Record<string, unknown> {
+  const signed = `${encodedHeader}.${encodedPayload}`;
   const signature = Buffer.from(encodedSignature, 'base64url');
-  if (!verifier.verify(publicKey, signature)) {
+  const publicKey = publicKeyFromJwk(jwk, alg);
+
+  let valid = false;
+  if (alg === 'RS256') {
+    const verifier = createVerify('RSA-SHA256');
+    verifier.update(signed);
+    verifier.end();
+    valid = verifier.verify(publicKey, signature);
+  } else if (alg === 'ES256' || alg === 'ES256K') {
+    // JWT ECDSA = raw r||s (ieee-p1363), не ASN.1 DER.
+    const verifier = createVerify('SHA256');
+    verifier.update(signed);
+    verifier.end();
+    valid = verifier.verify({ key: publicKey, dsaEncoding: 'ieee-p1363' }, signature);
+  } else {
+    valid = cryptoVerify(null, Buffer.from(signed), publicKey, signature);
+  }
+
+  if (!valid) {
     throw new Error('INVALID_ID_TOKEN_SIGNATURE');
   }
 
@@ -157,7 +251,12 @@ async function verifyRs256Jwt(idToken: string, clientId: string): Promise<Record
   }
 
   const aud = payload.aud;
-  if (aud !== clientId && aud !== Number(clientId) && String(aud) !== clientId) {
+  const audOk =
+    aud === clientId ||
+    aud === Number(clientId) ||
+    String(aud) === clientId ||
+    (Array.isArray(aud) && aud.some((value) => value === clientId || String(value) === clientId));
+  if (!audOk) {
     throw new Error('INVALID_ID_TOKEN_AUDIENCE');
   }
 
@@ -166,6 +265,27 @@ async function verifyRs256Jwt(idToken: string, clientId: string): Promise<Record
   }
 
   return payload;
+}
+
+async function postTokenRequest(
+  body: URLSearchParams,
+  headers: Record<string, string>
+): Promise<{ ok: boolean; status: number; json: { id_token?: string; error?: string; error_description?: string } | null }> {
+  const tokenRes = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+      ...headers,
+    },
+    body,
+  });
+
+  const json = (await tokenRes.json().catch(() => null)) as
+    | { id_token?: string; error?: string; error_description?: string }
+    | null;
+
+  return { ok: tokenRes.ok, status: tokenRes.status, json };
 }
 
 export async function exchangeCodeForClaims(
@@ -177,36 +297,41 @@ export async function exchangeCodeForClaims(
   const clientSecret = getTelegramClientSecret();
   const redirectUri = buildRedirectUri(requestUrl);
 
-  const body = new URLSearchParams({
+  const baseParams = {
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri,
     client_id: clientId,
     code_verifier: codeVerifier,
+  };
+
+  // Telegram принимает и client_secret_basic, и client_secret_post.
+  let result = await postTokenRequest(new URLSearchParams(baseParams), {
+    Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
   });
 
-  const tokenRes = await fetch(TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-    },
-    body,
-  });
+  if ((!result.ok || !result.json?.id_token) && result.json?.error === 'invalid_client') {
+    result = await postTokenRequest(
+      new URLSearchParams({ ...baseParams, client_secret: clientSecret }),
+      {}
+    );
+  }
 
-  const tokenJson = (await tokenRes.json().catch(() => null)) as
-    | { id_token?: string; error?: string; error_description?: string }
-    | null;
-
-  if (!tokenRes.ok || !tokenJson?.id_token) {
-    const details = tokenJson?.error_description ?? tokenJson?.error ?? tokenRes.statusText;
+  if (!result.ok || !result.json?.id_token) {
+    const details = result.json?.error_description ?? result.json?.error ?? `HTTP ${result.status}`;
+    console.error('Telegram token exchange failed', {
+      status: result.status,
+      error: result.json?.error,
+      error_description: result.json?.error_description,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+    });
     throw new Error(`TOKEN_EXCHANGE_FAILED:${details}`);
   }
 
-  const payload = await verifyRs256Jwt(tokenJson.id_token, clientId);
+  const payload = await verifyTelegramIdToken(result.json.id_token, clientId);
 
-  // Telegram Bot-API user id comes in `id` (profile scope). OIDC `sub` is a
-  // different opaque subject — never use it as telegram_id.
+  // Telegram Bot-API user id — claim `id` (profile). OIDC `sub` — другой opaque id.
   const rawId = payload.id;
   const telegramId =
     typeof rawId === 'number'
