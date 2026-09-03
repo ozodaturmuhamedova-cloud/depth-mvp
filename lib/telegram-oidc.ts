@@ -42,21 +42,47 @@ let jwksCache: JwksResponse | null = null;
 let jwksFetchedAt = 0;
 const JWKS_TTL_MS = 60 * 60 * 1000;
 
-export function getTelegramClientId(): string {
-  const clientId = process.env.TELEGRAM_CLIENT_ID?.trim();
-  if (clientId) return clientId;
+/** Убирает BOM, кавычки и пробелы — иначе Telegram отвечает invalid_client. */
+function cleanEnv(value: string | undefined | null): string | undefined {
+  if (value == null) return undefined;
+  let v = value.replace(/^\uFEFF/, '').trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).replace(/^\uFEFF/, '').trim();
+  }
+  return v || undefined;
+}
 
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+export function getTelegramClientId(): string {
+  const clientId = cleanEnv(process.env.TELEGRAM_CLIENT_ID);
+  if (clientId) {
+    if (!/^\d+$/.test(clientId)) {
+      throw new Error(
+        'TELEGRAM_CLIENT_ID must be the numeric Client ID from BotFather Web Login (digits only, no spaces/quotes)'
+      );
+    }
+    return clientId;
+  }
+
+  const token = cleanEnv(process.env.TELEGRAM_BOT_TOKEN);
   const fromToken = token?.split(':')[0];
-  if (fromToken) return fromToken;
+  if (fromToken && /^\d+$/.test(fromToken)) return fromToken;
 
   throw new Error('TELEGRAM_CLIENT_ID or TELEGRAM_BOT_TOKEN must be set');
 }
 
 function getTelegramClientSecret(): string {
-  const secret = process.env.TELEGRAM_CLIENT_SECRET?.trim();
+  const secret = cleanEnv(process.env.TELEGRAM_CLIENT_SECRET);
   if (!secret) {
     throw new Error('TELEGRAM_CLIENT_SECRET must be set for Telegram OIDC login');
+  }
+  // Bot token выглядит как "123456:AAF...". OIDC secret — отдельная строка без ':'.
+  if (/^\d+:[A-Za-z0-9_-]+$/.test(secret)) {
+    throw new Error(
+      'TELEGRAM_CLIENT_SECRET looks like a bot token. Use the OIDC Client Secret from BotFather → Web Login'
+    );
   }
   return secret;
 }
@@ -78,10 +104,10 @@ export function createOAuthState(): string {
 }
 
 export function buildRedirectUri(requestUrl: string): string {
-  const explicit = process.env.TELEGRAM_REDIRECT_URI?.trim();
+  const explicit = cleanEnv(process.env.TELEGRAM_REDIRECT_URI);
   if (explicit) return explicit;
 
-  const appUrl = process.env.APP_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const appUrl = cleanEnv(process.env.APP_URL) || cleanEnv(process.env.NEXT_PUBLIC_APP_URL);
   if (appUrl) {
     return new URL('/api/auth/telegram/callback', appUrl.endsWith('/') ? appUrl : `${appUrl}/`).toString();
   }
@@ -305,26 +331,53 @@ export async function exchangeCodeForClaims(
     code_verifier: codeVerifier,
   };
 
-  // Telegram принимает и client_secret_basic, и client_secret_post.
-  let result = await postTokenRequest(new URLSearchParams(baseParams), {
-    Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-  });
+  // Сначала client_secret_post — Basic auth чаще ломается из‑за спецсимволов в secret.
+  // Telegram discovery допускает оба метода.
+  const attempts: Array<{ label: string; run: () => ReturnType<typeof postTokenRequest> }> = [
+    {
+      label: 'client_secret_post',
+      run: () =>
+        postTokenRequest(new URLSearchParams({ ...baseParams, client_secret: clientSecret }), {}),
+    },
+    {
+      label: 'client_secret_basic',
+      run: () =>
+        postTokenRequest(new URLSearchParams(baseParams), {
+          // RFC 6749 §2.3.1: id/secret form-urlencoded before Base64.
+          Authorization: `Basic ${Buffer.from(
+            `${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`
+          ).toString('base64')}`,
+        }),
+    },
+    {
+      label: 'client_secret_basic_raw',
+      run: () =>
+        postTokenRequest(new URLSearchParams(baseParams), {
+          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+        }),
+    },
+  ];
 
-  if ((!result.ok || !result.json?.id_token) && result.json?.error === 'invalid_client') {
-    result = await postTokenRequest(
-      new URLSearchParams({ ...baseParams, client_secret: clientSecret }),
-      {}
-    );
+  let result: Awaited<ReturnType<typeof postTokenRequest>> | null = null;
+  let lastError: string | undefined;
+  for (const attempt of attempts) {
+    result = await attempt.run();
+    if (result.json?.id_token) break;
+    lastError = result.json?.error_description ?? result.json?.error ?? `HTTP ${result.status}`;
+    // Не крутим все методы при явной ошибке grant/code — client уже принят.
+    if (result.json?.error === 'invalid_grant') break;
   }
 
-  if (!result.ok || !result.json?.id_token) {
-    const details = result.json?.error_description ?? result.json?.error ?? `HTTP ${result.status}`;
+  if (!result?.json?.id_token) {
+    const details = lastError ?? 'unknown';
     console.error('Telegram token exchange failed', {
-      status: result.status,
-      error: result.json?.error,
-      error_description: result.json?.error_description,
+      status: result?.status,
+      error: result?.json?.error,
+      error_description: result?.json?.error_description,
       redirect_uri: redirectUri,
-      client_id: clientId,
+      // JSON.stringify показывает скрытые пробелы/\\r в Client ID
+      client_id: JSON.stringify(clientId),
+      client_id_len: clientId.length,
     });
     throw new Error(`TOKEN_EXCHANGE_FAILED:${details}`);
   }

@@ -76,6 +76,13 @@ export async function GET(request: NextRequest) {
     if (error instanceof Error && error.message.startsWith('TOKEN_EXCHANGE_FAILED:')) {
       const details = error.message.slice('TOKEN_EXCHANGE_FAILED:'.length);
       console.error('Telegram OIDC callback error:', error);
+      if (details === 'invalid_client' || /invalid_client/i.test(details)) {
+        return loginRedirect(
+          request,
+          next,
+          'Telegram отклонил Client ID (invalid_client). В Vercel проверьте TELEGRAM_CLIENT_ID: только цифры, без пробелов и кавычек; это Client ID из BotFather → Web Login (мини-приложение), не username бота. Кривая secp256k1 здесь ни при чём — JWT ещё не проверяется.'
+        );
+      }
       const hint =
         /scope|profile|es256k|eddsa|algorithm/i.test(details)
           ? ' Если в BotFather Advanced стоит ES256K/EdDSA — переключите на RS256 (нужен scope profile).'
@@ -85,6 +92,13 @@ export async function GET(request: NextRequest) {
         next,
         `Не удалось обменять код Telegram (${details}). Проверьте Client ID/Secret и Redirect URL.${hint}`
       );
+    }
+    if (
+      error instanceof Error &&
+      (error.message.includes('TELEGRAM_CLIENT_ID must be') ||
+        error.message.includes('TELEGRAM_CLIENT_SECRET looks like'))
+    ) {
+      return loginRedirect(request, next, error.message);
     }
     console.error('Telegram OIDC callback error:', error);
     return loginRedirect(request, next, 'Не удалось войти через Telegram');
