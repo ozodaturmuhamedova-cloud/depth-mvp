@@ -72,6 +72,7 @@ const emptySettingsForm = {
   hero_image_url: '',
   hero_author_name: '',
   hero_author_role: '',
+  header_portrait_url: '',
 }
 
 interface SettingsResponse extends ApiError {
@@ -89,6 +90,7 @@ export function AdminPanel() {
   const [editingCourse, setEditingCourse] = useState<AdminCourse | null>(null)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [uploadingHero, setUploadingHero] = useState(false)
+  const [uploadingHeaderPortrait, setUploadingHeaderPortrait] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [importingDocx, setImportingDocx] = useState(false)
   const [docxInfo, setDocxInfo] = useState('')
@@ -108,6 +110,7 @@ export function AdminPanel() {
         hero_image_url: settings.data.settings.hero_image_url ?? '',
         hero_author_name: settings.data.settings.hero_author_name ?? '',
         hero_author_role: settings.data.settings.hero_author_role ?? '',
+        header_portrait_url: settings.data.settings.header_portrait_url ?? '',
       })
     }
   }
@@ -261,8 +264,9 @@ export function AdminPanel() {
       })
       const data = (await res.json().catch(() => null)) as ApiError | null
       if (res.ok) {
-        setMessage('Главная страница обновлена')
+        setMessage('Настройки главной и шапки обновлены')
         settings.reload()
+        router.refresh()
       } else {
         setMessage(data?.error ?? 'Ошибка сохранения')
       }
@@ -275,6 +279,34 @@ export function AdminPanel() {
 
   const handleRemoveHeroImage = () => {
     setSettingsForm((prev) => ({ ...prev, hero_image_url: '' }))
+  }
+
+  const handleHeaderPortraitFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setUploadingHeaderPortrait(true)
+    setMessage('')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/admin/covers', { method: 'POST', body: formData })
+      const data = (await res.json().catch(() => null)) as (ApiError & { url?: string }) | null
+      if (res.ok && data?.url) {
+        setSettingsForm((prev) => ({ ...prev, header_portrait_url: data.url! }))
+      } else {
+        setMessage(data?.error ?? 'Ошибка загрузки портрета для шапки')
+      }
+    } catch {
+      setMessage('Сетевая ошибка при загрузке портрета')
+    } finally {
+      setUploadingHeaderPortrait(false)
+    }
+  }
+
+  const handleRemoveHeaderPortrait = () => {
+    setSettingsForm((prev) => ({ ...prev, header_portrait_url: '' }))
   }
 
   const handleDeleteBook = async (id: number) => {
@@ -388,7 +420,7 @@ export function AdminPanel() {
             setMessage('')
           }}
         >
-          Главная
+          Главная и шапка
         </Button>
         <Button
           variant={tab === 'users' ? 'primary' : 'outline'}
@@ -663,62 +695,119 @@ export function AdminPanel() {
 
       {tab === 'home' && (
         <div>
-          <h2 className="mb-4 font-serif text-2xl font-bold text-ink-900">Герой-блок главной страницы</h2>
+          <h2 className="mb-4 font-serif text-2xl font-bold text-ink-900">Главная и шапка</h2>
           <form
             onSubmit={handleSaveSettings}
-            className="mb-8 space-y-4 rounded-card border border-ink-200 bg-white p-5 shadow-card sm:p-6"
+            className="mb-8 space-y-8 rounded-card border border-ink-200 bg-white p-5 shadow-card sm:p-6"
           >
-            <div className="flex items-start gap-4">
-              <div className="relative aspect-[3/4] w-32 shrink-0 overflow-hidden rounded-lg border border-ink-200 bg-ink-100">
-                {settingsForm.hero_image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={settingsForm.hero_image_url}
-                    alt="Портрет для героя-блока"
-                    className="h-full w-full object-cover object-top"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center p-2 text-center text-xs text-ink-400">
-                    Нет фото
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 space-y-2">
-                <p className="text-sm text-ink-600">
-                  Портретное изображение (соотношение 3:4) для главной страницы. Рекомендуется фото автора.
+            <section className="space-y-4">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-ink-900">Портрет в шапке</h3>
+                <p className="mt-1 text-sm text-ink-600">
+                  Круглое фото рядом с логотипом в верхней навигации на всех страницах.
                 </p>
-                <div className="flex flex-wrap items-center gap-2">
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-ink-200 bg-ink-100">
+                  {settingsForm.header_portrait_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={settingsForm.header_portrait_url}
+                      alt="Портрет в шапке"
+                      className="h-full w-full object-cover object-top"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-center text-[10px] leading-tight text-ink-400">
+                      Нет
+                      <br />
+                      фото
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 pt-2">
                   <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-ink-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 transition hover:border-brand-500 hover:text-brand-700">
-                    Загрузить фото
+                    Загрузить портрет
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
-                      onChange={handleHeroFileChange}
-                      disabled={uploadingHero}
+                      onChange={handleHeaderPortraitFileChange}
+                      disabled={uploadingHeaderPortrait}
                       className="hidden"
                     />
                   </label>
-                  {settingsForm.hero_image_url && (
-                    <Button type="button" variant="outline" size="sm" onClick={handleRemoveHeroImage}>
-                      Удалить фото
+                  {settingsForm.header_portrait_url && (
+                    <Button type="button" variant="outline" size="sm" onClick={handleRemoveHeaderPortrait}>
+                      Удалить
                     </Button>
                   )}
-                  {uploadingHero && <span className="text-sm text-ink-500">Загрузка...</span>}
+                  {uploadingHeaderPortrait && <span className="text-sm text-ink-500">Загрузка...</span>}
                 </div>
               </div>
-            </div>
-            <Input
-              placeholder="Имя автора (например, Озода Турмухамедова)"
-              value={settingsForm.hero_author_name}
-              onChange={(e) => setSettingsForm({ ...settingsForm, hero_author_name: e.target.value })}
-            />
-            <Input
-              placeholder="Подпись под именем (например, Психолог, автор книг)"
-              value={settingsForm.hero_author_role}
-              onChange={(e) => setSettingsForm({ ...settingsForm, hero_author_role: e.target.value })}
-            />
+            </section>
+
+            <div className="border-t border-ink-100" />
+
+            <section className="space-y-4">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-ink-900">Герой-блок главной</h3>
+                <p className="mt-1 text-sm text-ink-600">
+                  Портретное изображение (соотношение 3:4) для главной страницы.
+                </p>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="relative aspect-[3/4] w-32 shrink-0 overflow-hidden rounded-lg border border-ink-200 bg-ink-100">
+                  {settingsForm.hero_image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={settingsForm.hero_image_url}
+                      alt="Портрет для героя-блока"
+                      className="h-full w-full object-cover object-top"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center p-2 text-center text-xs text-ink-400">
+                      Нет фото
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-ink-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 transition hover:border-brand-500 hover:text-brand-700">
+                      Загрузить фото
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                        onChange={handleHeroFileChange}
+                        disabled={uploadingHero}
+                        className="hidden"
+                      />
+                    </label>
+                    {settingsForm.hero_image_url && (
+                      <Button type="button" variant="outline" size="sm" onClick={handleRemoveHeroImage}>
+                        Удалить фото
+                      </Button>
+                    )}
+                    {uploadingHero && <span className="text-sm text-ink-500">Загрузка...</span>}
+                  </div>
+                </div>
+              </div>
+              <Input
+                placeholder="Имя автора (например, Озода Турмухамедова)"
+                value={settingsForm.hero_author_name}
+                onChange={(e) => setSettingsForm({ ...settingsForm, hero_author_name: e.target.value })}
+              />
+              <Input
+                placeholder="Подпись под именем (например, Психолог, автор книг)"
+                value={settingsForm.hero_author_role}
+                onChange={(e) => setSettingsForm({ ...settingsForm, hero_author_role: e.target.value })}
+              />
+            </section>
+
             <div className="flex gap-3">
-              <Button type="submit" variant="success" disabled={savingSettings || uploadingHero}>
+              <Button
+                type="submit"
+                variant="success"
+                disabled={savingSettings || uploadingHero || uploadingHeaderPortrait}
+              >
                 Сохранить
               </Button>
             </div>

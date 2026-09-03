@@ -61,6 +61,7 @@ export interface SiteSettings {
   hero_image_url: string | null;
   hero_author_name: string | null;
   hero_author_role: string | null;
+  header_portrait_url: string | null;
 }
 
 export interface CourseListResponse {

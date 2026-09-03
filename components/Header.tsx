@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Logo } from './Logo'
 import { AuthNav } from './AuthNav'
+import { getSiteSettings } from '@/lib/site-settings'
 
 const navLinks = [
   { href: '/books', label: 'Книги' },
@@ -8,12 +9,14 @@ const navLinks = [
   { href: '/pricing', label: 'Подписка' },
 ]
 
-export function Header() {
+export async function Header() {
+  const settings = await getSiteSettings()
+
   return (
     <header className="sticky top-0 z-40 border-b border-ink-200/70 bg-paper/85 backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="flex items-center justify-between gap-4 py-3.5">
-          <Logo />
+          <Logo portraitUrl={settings.header_portrait_url} />
           <div className="hidden items-center gap-1 md:flex">
             {navLinks.map((link) => (
               <Link

@@ -2,32 +2,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ButtonLink } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
-import { all } from '@/lib/db'
-import type { SiteSettings } from '@/lib/types'
+import { getSiteSettings } from '@/lib/site-settings'
 
-// Герой-блок читает настройки на каждый запрос, чтобы фото/имя автора,
+// Герой-блок и хедер читают настройки на каждый запрос, чтобы фото/имя автора,
 // загруженные в админке, отображались сразу без пересборки страницы.
 export const dynamic = 'force-dynamic'
-
-async function getHeroSettings(): Promise<SiteSettings> {
-  const settings: SiteSettings = {
-    hero_image_url: null,
-    hero_author_name: null,
-    hero_author_role: null,
-  }
-  try {
-    const rows = await all<{ key: string; value: string }>('SELECT key, value FROM site_settings');
-    for (const row of rows) {
-      if (row.key === 'hero_image_url' || row.key === 'hero_author_name' || row.key === 'hero_author_role') {
-        settings[row.key] = row.value;
-      }
-    }
-  } catch (error) {
-    // Сбой БД не должен ронять главную страницу — просто рендерим герой без фото.
-    console.error('Hero settings load error:', error);
-  }
-  return settings;
-}
 
 const features = [
   {
@@ -63,7 +42,7 @@ const features = [
 ]
 
 export default async function Home() {
-  const hero = await getHeroSettings()
+  const hero = await getSiteSettings()
   const hasHeroImage = !!hero.hero_image_url && hero.hero_image_url.startsWith('/')
   const authorName = hero.hero_author_name || 'Озода Турмухамедова'
   const authorRole = hero.hero_author_role || 'Психолог, автор книг'

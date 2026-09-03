@@ -63,18 +63,21 @@ export const grantSubscriptionSchema = z.object({
   message: 'Укажите план или количество дней',
 });
 
+const localImageUrl = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((v) => v === '' || v.startsWith('/'), 'Изображение должно быть локальным файлом (используйте загрузку)')
+  .optional()
+  .nullable();
+
 export const siteSettingsSchema = z.object({
   // Только локальный файл (/api/covers/...) — та же причина, что и у cover_url:
   // next.config.ts не разрешает внешние хосты для next/image.
-  hero_image_url: z
-    .string()
-    .trim()
-    .max(2000)
-    .refine((v) => v === '' || v.startsWith('/'), 'Изображение должно быть локальным файлом (используйте загрузку)')
-    .optional()
-    .nullable(),
+  hero_image_url: localImageUrl,
   hero_author_name: z.string().trim().max(200).optional().nullable(),
   hero_author_role: z.string().trim().max(300).optional().nullable(),
+  header_portrait_url: localImageUrl,
 });
 
 /**
