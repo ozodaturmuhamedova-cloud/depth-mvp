@@ -65,6 +65,14 @@ export interface SiteSettings {
   header_portrait_url: string | null;
 }
 
+export interface PaymentSettings {
+  payment_card_number: string | null;
+  payment_card_holder: string | null;
+  payment_telegram_url: string | null;
+  price_month: string | null;
+  price_year: string | null;
+}
+
 export interface CourseListResponse {
   courses: CourseSummary[];
 }

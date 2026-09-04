@@ -11,7 +11,7 @@ import { notifyAuthChanged } from '@/lib/auth-events'
 import { useFetch } from '@/lib/hooks/useFetch'
 import { splitHtmlChapters, truncateHtmlPreview } from '@/lib/chapters'
 import { UsersTab } from './UsersTab'
-import type { ApiError, BookLanguage, ContentFormat, SiteSettings } from '@/lib/types'
+import type { ApiError, BookLanguage, ContentFormat, PaymentSettings, SiteSettings } from '@/lib/types'
 
 const LANGUAGE_LABELS: Record<BookLanguage, string> = {
   ru: 'Русский',
@@ -77,17 +77,30 @@ const emptySettingsForm = {
   header_portrait_url: '',
 }
 
+const emptyPaymentForm = {
+  payment_card_number: '',
+  payment_card_holder: '',
+  payment_telegram_url: '',
+  price_month: '',
+  price_year: '',
+}
+
 interface SettingsResponse extends ApiError {
   settings: SiteSettings
 }
 
+interface PaymentSettingsResponse extends ApiError {
+  settings: PaymentSettings
+}
+
 export function AdminPanel() {
   const router = useRouter()
-  const [tab, setTab] = useState<'books' | 'courses' | 'home' | 'users'>('books')
+  const [tab, setTab] = useState<'books' | 'courses' | 'home' | 'users' | 'subscriptions'>('books')
   const [message, setMessage] = useState('')
   const [bookForm, setBookForm] = useState(emptyBookForm)
   const [courseForm, setCourseForm] = useState(emptyCourseForm)
   const [settingsForm, setSettingsForm] = useState(emptySettingsForm)
+  const [paymentForm, setPaymentForm] = useState(emptyPaymentForm)
   const [editingBook, setEditingBook] = useState<AdminBook | null>(null)
   const [editingCourse, setEditingCourse] = useState<AdminCourse | null>(null)
   const [uploadingCover, setUploadingCover] = useState(false)
@@ -95,12 +108,14 @@ export function AdminPanel() {
   const [uploadingHero, setUploadingHero] = useState(false)
   const [uploadingHeaderPortrait, setUploadingHeaderPortrait] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
+  const [savingPayment, setSavingPayment] = useState(false)
   const [importingDocx, setImportingDocx] = useState(false)
   const [docxInfo, setDocxInfo] = useState('')
 
   const books = useFetch<BooksResponse>('/api/admin/books')
   const courses = useFetch<CoursesResponse>('/api/admin/courses')
   const settings = useFetch<SettingsResponse>('/api/admin/settings')
+  const paymentSettings = useFetch<PaymentSettingsResponse>('/api/admin/payment-settings')
 
   // Подставляем загруженные настройки в форму один раз при их появлении/обновлении —
   // без useEffect, по рекомендованному React-паттерну «adjusting state during render»,
@@ -114,6 +129,20 @@ export function AdminPanel() {
         hero_author_name: settings.data.settings.hero_author_name ?? '',
         hero_author_role: settings.data.settings.hero_author_role ?? '',
         header_portrait_url: settings.data.settings.header_portrait_url ?? '',
+      })
+    }
+  }
+
+  const [syncedPayment, setSyncedPayment] = useState<PaymentSettingsResponse | null>(null)
+  if (paymentSettings.data && paymentSettings.data !== syncedPayment) {
+    setSyncedPayment(paymentSettings.data)
+    if (paymentSettings.data.settings) {
+      setPaymentForm({
+        payment_card_number: paymentSettings.data.settings.payment_card_number ?? '',
+        payment_card_holder: paymentSettings.data.settings.payment_card_holder ?? '',
+        payment_telegram_url: paymentSettings.data.settings.payment_telegram_url ?? '',
+        price_month: paymentSettings.data.settings.price_month ?? '',
+        price_year: paymentSettings.data.settings.price_year ?? '',
       })
     }
   }
@@ -304,6 +333,30 @@ export function AdminPanel() {
     }
   }
 
+  const handleSavePayment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingPayment(true)
+    setMessage('')
+    try {
+      const res = await fetch('/api/admin/payment-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentForm),
+      })
+      const data = (await res.json().catch(() => null)) as ApiError | null
+      if (res.ok) {
+        setMessage('Настройки подписок обновлены')
+        paymentSettings.reload()
+      } else {
+        setMessage(data?.error ?? 'Ошибка сохранения')
+      }
+    } catch {
+      setMessage('Сетевая ошибка при сохранении')
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
   const handleRemoveHeroImage = () => {
     setSettingsForm((prev) => ({ ...prev, hero_image_url: '' }))
   }
@@ -451,6 +504,15 @@ export function AdminPanel() {
           Главная и шапка
         </Button>
         <Button
+          variant={tab === 'subscriptions' ? 'primary' : 'outline'}
+          onClick={() => {
+            setTab('subscriptions')
+            setMessage('')
+          }}
+        >
+          Подписки
+        </Button>
+        <Button
           variant={tab === 'users' ? 'primary' : 'outline'}
           onClick={() => {
             setTab('users')
@@ -462,6 +524,58 @@ export function AdminPanel() {
       </div>
 
       {tab === 'users' && <UsersTab />}
+
+      {tab === 'subscriptions' && (
+        <div>
+          <h2 className="mb-2 font-serif text-2xl font-bold text-ink-900">Подписки</h2>
+          <p className="mb-6 text-sm text-ink-600">
+            Реквизиты и цены для оформления подписки. После получения чека в Telegram выдайте
+            подписку во вкладке «Пользователи».
+          </p>
+          <form
+            onSubmit={handleSavePayment}
+            className="mb-8 space-y-4 rounded-card border border-ink-200 bg-white p-5 shadow-card sm:p-6"
+          >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Input
+                label="Цена — месяц"
+                placeholder="например 99 000 сум или $9.99"
+                value={paymentForm.price_month}
+                onChange={(e) => setPaymentForm({ ...paymentForm, price_month: e.target.value })}
+              />
+              <Input
+                label="Цена — год"
+                placeholder="например 990 000 сум или $99.99"
+                value={paymentForm.price_year}
+                onChange={(e) => setPaymentForm({ ...paymentForm, price_year: e.target.value })}
+              />
+            </div>
+            <Input
+              label="Номер карты"
+              placeholder="8600 ···· ···· ····"
+              value={paymentForm.payment_card_number}
+              onChange={(e) => setPaymentForm({ ...paymentForm, payment_card_number: e.target.value })}
+            />
+            <Input
+              label="Имя держателя карты"
+              placeholder="IVAN IVANOV"
+              value={paymentForm.payment_card_holder}
+              onChange={(e) => setPaymentForm({ ...paymentForm, payment_card_holder: e.target.value })}
+            />
+            <Input
+              label="Ссылка на Telegram (для чека)"
+              placeholder="https://t.me/username"
+              value={paymentForm.payment_telegram_url}
+              onChange={(e) => setPaymentForm({ ...paymentForm, payment_telegram_url: e.target.value })}
+            />
+            <div className="flex justify-end pt-2">
+              <Button type="submit" disabled={savingPayment || paymentSettings.loading}>
+                {savingPayment ? 'Сохранение...' : 'Сохранить'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {tab === 'books' && (
         <div>

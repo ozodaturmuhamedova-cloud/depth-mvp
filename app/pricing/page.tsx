@@ -1,32 +1,53 @@
+'use client'
+
 import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
+import { ButtonLink } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { LoadingState } from '@/components/LoadingState'
+import { useFetch } from '@/lib/hooks/useFetch'
+import type { ApiError, PaymentSettings } from '@/lib/types'
 
 interface Plan {
   id: 'month' | 'year'
   name: string
-  price: string
   description: string
   highlighted?: boolean
+  defaultPrice: string
 }
 
 const plans: Plan[] = [
   {
     id: 'month',
     name: 'Месяц',
-    price: '$9.99',
     description: 'Доступ ко всем книгам на 30 дней',
+    defaultPrice: '$9.99',
   },
   {
     id: 'year',
     name: 'Год',
-    price: '$99.99',
     description: 'Доступ на 365 дней со скидкой',
     highlighted: true,
+    defaultPrice: '$99.99',
   },
 ]
 
+interface PaymentSettingsResponse extends ApiError {
+  settings: PaymentSettings
+}
+
 export default function PricingPage() {
+  const payment = useFetch<PaymentSettingsResponse>('/api/payment-settings')
+
+  if (payment.loading) {
+    return <LoadingState label="Загрузка тарифов..." />
+  }
+
+  const settings = payment.data?.settings
+  const priceFor = (plan: Plan) => {
+    if (plan.id === 'month') return settings?.price_month || plan.defaultPrice
+    return settings?.price_year || plan.defaultPrice
+  }
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-12 text-center">
@@ -53,17 +74,22 @@ export default function PricingPage() {
             )}
             <h2 className="font-serif text-2xl font-bold text-ink-900">{plan.name}</h2>
             <p className="mt-1 text-sm text-ink-500">{plan.description}</p>
-            <p className="mt-5 font-serif text-5xl font-bold text-ink-900">{plan.price}</p>
-            <Button variant={plan.highlighted ? 'primary' : 'outline'} size="lg" className="mt-7 w-full" disabled>
-              Подписку выдаёт администратор
-            </Button>
+            <p className="mt-5 font-serif text-5xl font-bold text-ink-900">{priceFor(plan)}</p>
+            <ButtonLink
+              href={`/pricing/checkout?plan=${plan.id}`}
+              variant={plan.highlighted ? 'primary' : 'outline'}
+              size="lg"
+              className="mt-7 w-full"
+            >
+              Оформить
+            </ButtonLink>
           </Card>
         ))}
       </div>
 
       <div className="mt-8 rounded-card border border-ink-200 bg-white p-4 text-center text-sm text-ink-600">
-        Самостоятельное оформление подписки недоступно. Чтобы получить доступ, обратитесь к администратору —
-        подписку выдают и продлевают вручную.
+        Оплата переводом на карту. После перевода отправьте чек в Telegram — подписку подтвердит
+        администратор.
       </div>
     </div>
   )

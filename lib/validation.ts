@@ -88,6 +88,25 @@ export const siteSettingsSchema = z.object({
   header_portrait_url: localImageUrl,
 });
 
+const optionalTelegramUrl = z
+  .string()
+  .trim()
+  .max(300)
+  .refine(
+    (v) => v === '' || /^https:\/\/(t\.me|telegram\.me)\//i.test(v),
+    'Ссылка должна вести на Telegram (https://t.me/...)'
+  )
+  .optional()
+  .nullable();
+
+export const paymentSettingsSchema = z.object({
+  payment_card_number: z.string().trim().max(40).optional().nullable(),
+  payment_card_holder: z.string().trim().max(200).optional().nullable(),
+  payment_telegram_url: optionalTelegramUrl,
+  price_month: z.string().trim().max(40).optional().nullable(),
+  price_year: z.string().trim().max(40).optional().nullable(),
+});
+
 /**
  * Вспомогательная обёртка: парсит JSON тело запроса через переданную zod-схему
  * и возвращает либо данные, либо человекочитаемое сообщение об ошибке.
