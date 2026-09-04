@@ -51,6 +51,14 @@ export const courseSchema = z.object({
   title: z.string().trim().min(1).max(300),
   description: z.string().trim().max(5000).optional().nullable(),
   telegram_url: telegramUrlSchema,
+  // Только локальные файлы (/api/covers/...) — как у книг.
+  cover_url: z
+    .string()
+    .trim()
+    .max(2000)
+    .refine((v) => v === '' || v.startsWith('/'), 'Обложка должна быть локальным файлом (используйте загрузку)')
+    .optional()
+    .nullable(),
   language: z.enum(['ru', 'uz']).optional().default('ru'),
 });
 

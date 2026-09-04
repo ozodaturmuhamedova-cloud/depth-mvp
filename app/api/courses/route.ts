@@ -8,12 +8,12 @@ export async function GET(request: NextRequest) {
 
     const courses = language
       ? await all(
-          `SELECT id, title, description, telegram_url, language
+          `SELECT id, title, description, telegram_url, cover_url, language
            FROM courses WHERE language = ?`,
           [language]
         )
       : await all(`
-          SELECT id, title, description, telegram_url, language
+          SELECT id, title, description, telegram_url, cover_url, language
           FROM courses
         `);
     return NextResponse.json({ courses });

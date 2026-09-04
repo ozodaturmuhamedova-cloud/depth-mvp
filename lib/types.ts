@@ -39,6 +39,7 @@ export interface CourseSummary {
   title: string;
   description: string | null;
   telegram_url: string | null;
+  cover_url: string | null;
   language: BookLanguage;
 }
 

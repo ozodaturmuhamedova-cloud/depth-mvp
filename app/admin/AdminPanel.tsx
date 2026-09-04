@@ -37,6 +37,7 @@ interface AdminCourse {
   title: string
   description: string | null
   telegram_url: string | null
+  cover_url: string | null
   language: BookLanguage
 }
 
@@ -65,6 +66,7 @@ const emptyCourseForm = {
   title: '',
   description: '',
   telegram_url: '',
+  cover_url: '',
   language: 'ru' as BookLanguage,
 }
 
@@ -89,6 +91,7 @@ export function AdminPanel() {
   const [editingBook, setEditingBook] = useState<AdminBook | null>(null)
   const [editingCourse, setEditingCourse] = useState<AdminCourse | null>(null)
   const [uploadingCover, setUploadingCover] = useState(false)
+  const [uploadingCourseCover, setUploadingCourseCover] = useState(false)
   const [uploadingHero, setUploadingHero] = useState(false)
   const [uploadingHeaderPortrait, setUploadingHeaderPortrait] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
@@ -227,6 +230,30 @@ export function AdminPanel() {
     }
   }
 
+  const handleCourseCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setUploadingCourseCover(true)
+    setMessage('')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/admin/covers', { method: 'POST', body: formData })
+      const data = (await res.json().catch(() => null)) as (ApiError & { url?: string }) | null
+      if (res.ok && data?.url) {
+        setCourseForm((prev) => ({ ...prev, cover_url: data.url! }))
+      } else {
+        setMessage(data?.error ?? 'Ошибка загрузки обложки')
+      }
+    } catch {
+      setMessage('Сетевая ошибка при загрузке обложки')
+    } finally {
+      setUploadingCourseCover(false)
+    }
+  }
+
   // --- Главная (герой-блок) ---
   const handleHeroFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -351,6 +378,7 @@ export function AdminPanel() {
       title: course.title,
       description: course.description ?? '',
       telegram_url: course.telegram_url ?? '',
+      cover_url: course.cover_url ?? '',
       language: course.language ?? 'ru',
     })
   }
@@ -638,6 +666,38 @@ export function AdminPanel() {
               <option value="ru">{LANGUAGE_LABELS.ru}</option>
               <option value="uz">{LANGUAGE_LABELS.uz}</option>
             </Select>
+            <div className="flex items-start gap-3">
+              {courseForm.cover_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={courseForm.cover_url}
+                  alt="Превью обложки"
+                  className="h-[110px] w-20 shrink-0 rounded-lg border border-ink-200 object-cover"
+                />
+              )}
+              <div className="flex-1 space-y-2">
+                <Input
+                  placeholder="URL обложки"
+                  value={courseForm.cover_url}
+                  onChange={(e) => setCourseForm({ ...courseForm, cover_url: e.target.value })}
+                />
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-ink-300 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 transition hover:border-brand-500 hover:text-brand-700">
+                    Загрузить с компьютера
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+                      onChange={handleCourseCoverFileChange}
+                      disabled={uploadingCourseCover}
+                      className="hidden"
+                    />
+                  </label>
+                  {uploadingCourseCover && (
+                    <span className="text-sm text-ink-500">Загрузка...</span>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="flex gap-3">
               <Button type="submit" variant="success">
                 {editingCourse ? 'Обновить' : 'Добавить'}

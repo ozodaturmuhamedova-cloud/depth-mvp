@@ -54,6 +54,7 @@ export const SCHEMA = `
     title TEXT NOT NULL,
     description TEXT,
     telegram_url TEXT,
+    cover_url TEXT,
     language TEXT NOT NULL DEFAULT 'ru'
   );
 
@@ -194,7 +195,14 @@ async function migrate() {
   if (!courseColumnsAfter.includes('language')) {
     await db.execute(`ALTER TABLE courses ADD COLUMN language TEXT NOT NULL DEFAULT 'ru'`);
   }
+  if (!courseColumnsAfter.includes('cover_url')) {
+    await db.execute(`ALTER TABLE courses ADD COLUMN cover_url TEXT`);
+  }
   await db.execute(`UPDATE courses SET language = 'ru' WHERE language IS NULL OR language NOT IN ('ru', 'uz')`);
+  // Та же политика, что у книг: только локальные /api/covers/...
+  await db.execute(
+    `UPDATE courses SET cover_url = NULL WHERE cover_url IS NOT NULL AND cover_url NOT LIKE '/%'`
+  );
 
   // Не более одной активной подписки на пользователя — исключает дубли
   // при параллельных запросах на выдачу подписки из админ-панели.

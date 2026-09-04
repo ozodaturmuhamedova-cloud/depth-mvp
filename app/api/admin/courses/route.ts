@@ -9,6 +9,7 @@ interface CourseRow {
   title: string;
   description: string | null;
   telegram_url: string | null;
+  cover_url: string | null;
   language: string;
 }
 
@@ -39,11 +40,11 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
-    const { title, description, telegram_url, language } = parsed.data;
+    const { title, description, telegram_url, cover_url, language } = parsed.data;
     await run(
-      `INSERT INTO courses (title, description, telegram_url, language)
-       VALUES (?, ?, ?, ?)`,
-      [title, description || null, telegram_url, language]
+      `INSERT INTO courses (title, description, telegram_url, cover_url, language)
+       VALUES (?, ?, ?, ?, ?)`,
+      [title, description || null, telegram_url, cover_url || null, language]
     );
     return NextResponse.json({ success: true }, { status: 201 });
   } catch {
